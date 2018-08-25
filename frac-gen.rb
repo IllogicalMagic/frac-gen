@@ -103,6 +103,7 @@ end
 fracmath = 'FracMathSidi.cpp'
 
 num = $seed
+Dir.mkdir("Images") unless Dir.exist?("Images")
 dir = File.join("Images", $seed.to_s)
 Dir.mkdir(dir)
 File.open(File.join(dir, "last_seed.txt"), "w") do |f|
