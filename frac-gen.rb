@@ -9,45 +9,143 @@ require 'fileutils'
 $seed = Time.now.to_i
 $rng = Random.new($seed)
 
+class Func
+  attr_reader :fn
+  attr_reader :optype
+
+  def initialize(fn, arity, optype)
+    @fn = fn
+    @arity = arity
+    @optype = optype
+  end
+
+  def arity
+    @arity ? @arity : $rng.rand(2..3)
+  end
+end
+
+class Ternary
+  def initialize
+  end
+
+  def operands
+    if @operands
+      @operands
+    else
+      cond = Node.new(log_fn[$rng.rand(log_fn.size)])
+      op1 = Node.new(simple_fn[$rng.rand(simple_fn.size)])
+      op2 = Node.new(simple_fn[$rng.rand(simple_fn.size)])
+      @operands = [cond, op1, op2]
+    end
+  end
+end
+
+class Leaf
+  attr_reader :fn
+
+  def initialize(fn)
+    @fn = fn
+  end
+
+  def arity
+    0
+  end
+end
+
 NM = "std::"
-FNS = [[NM + "sin", 1],
-       [NM + "cos", 1],
-       [NM + "tan", 1],
-       [NM + "asin", 1],
-       [NM + "acos", 1],
-       [NM + "atan", 1],
-       [NM + "sinh", 1],
-       [NM + "cosh", 1],
-       [NM + "tanh", 1],
-       [NM + "asinh", 1],
-       [NM + "acosh", 1],
-       [NM + "atanh", 1],
-       [NM + "exp", 1],
-       [NM + "log", 1],
-       [NM + "sqrt", 1],
-       [NM + "pow", 2],
-       ["+", nil],
-       ["-", nil],
-       ["*", nil],
-       ["/", nil]]
+
+$main = self
+
+def simple_fn
+  if $main.instance_variable_defined?(:@fns)
+    $main.instance_variable_get(:@fns)
+  else
+    $main.instance_variable_set(:@fns, [[NM + "sin", 1, :simple_fn],
+                                       [NM + "cos", 1, :simple_fn],
+                                       [NM + "tan", 1, :simple_fn],
+                                       [NM + "asin", 1, :simple_fn],
+                                       [NM + "acos", 1, :simple_fn],
+                                       [NM + "atan", 1, :simple_fn],
+                                       [NM + "sinh", 1, :simple_fn],
+                                       [NM + "cosh", 1, :simple_fn],
+                                       [NM + "tanh", 1, :simple_fn],
+                                       [NM + "asinh", 1, :simple_fn],
+                                       [NM + "acosh", 1, :simple_fn],
+                                       [NM + "atanh", 1, :simple_fn],
+                                       [NM + "exp", 1, :simple_fn],
+                                       [NM + "log", 1, :simple_fn],
+                                       [NM + "sqrt", 1, :simple_fn],
+                                       [NM + "pow", 2, :simple_fn],
+                                       ["+", nil, :simple_fn],
+                                       ["-", nil, :simple_fn],
+                                       ["*", nil, :simple_fn],
+                                       ["/", nil, :simple_fn]
+                                      ].map{ |args| Func.new(*args) })
+  end
+end
+
+def cmp_fn
+  if $main.instance_variable_defined?(:@cmps)
+    $main.instance_variable_get(:@cmps)
+  else
+    $main.instance_variable_set(:@cmps, [["<", 2, :simple_fn],
+                                         [">", 2, :simple_fn],
+                                         ["<=", 2, :simple_fn],
+                                         [">=", 2, :simple_fn],
+                                         ["==", 2, :simple_fn],
+                                         ["!=", 2, :simple_fn],
+                                        ].map{ |args| Func.new(*args) })
+  end
+end
+
+def log_fn
+  if $main.instance_variable_defined?(:@logs)
+    $main.instance_variable_get(:@logs)
+  else
+    $main.instance_variable_set(:@logs, [["&&", nil, :cmp_fn],
+                                         ["||", nil, :cmp_fn],
+                                        ].map{ |args| Func.new(*args) })
+  end
+end
+
+class BadExpr < StandardError
+end
+
+$level = nil
 
 class Node
   Point = 'Pt'
   Num = 'num'
 
-  def initialize(fn, arity)
+  def initialize(fn)
+    if $level == 1000
+      $level = 0
+      fail BadExpr
+    end
+    $level += 1
+
     @fn = fn
-    @operands = Array.new(arity).map do |op|
-      r = $rng.rand(FNS.size * 2)
-      if r < FNS.size
-        fn = FNS[r]
-        ops = fn[1] ? fn[1] : $rng.rand(2..4)
-        Node.new(fn[0], ops)
-      else
-        if $rng.rand() < 0.7
-          Node.new(Point, 0)
+    if @fn.respond_to?(:operands)
+      @operands = @fn.operands
+    else
+      @operands = Array.new(fn.arity).map do |op|
+        if (@fn.optype != :simple_fn)
+          sel = $main.send(@fn.optype)
+          fn = sel[$rng.rand(sel.size)]
+          Node.new(fn)
         else
-          Node.new(Num, 0)
+          r = $rng.rand(simple_fn.size * 2.5)
+          # Simple function.
+          if (r < simple_fn.size)
+            fn = simple_fn[$rng.rand(simple_fn.size)]
+            Node.new(fn)
+          # Ternary.
+          elsif r < simple_fn.size * 1.2
+            Node.new(Ternary.new)
+          # Leaf.
+          else
+            Node.new(Leaf.new($rng.rand() < 0.7 ? Point : Num))
+          end
         end
       end
     end
@@ -56,12 +154,18 @@ class Node
   def to_s
     ops = @operands.map{ |o| o.to_s }
     res = case
-          when ['*','/','+','-','**'].include?(@fn)
-            ops.join(" #{@fn} ")
-          when [Point, Num].include?(@fn)
-            @fn
+          when @fn.is_a?(Ternary)
+            ops[0].to_s + " ? " + ops[1].to_s + " : "  + ops[2].to_s
+          when ['*','/','+','-','**'].include?(@fn.fn)
+            ops.join(" #{@fn.fn} ")
+          when log_fn.map{ |f| f.fn }.include?(@fn.fn)
+            ops.map{ |o| o.to_s }.join(" #{@fn.fn} ")
+          when cmp_fn.map{ |f| f.fn }.include?(@fn.fn)
+            ops.map{ |o| "std::abs(#{o.to_s})" }.join(" #{@fn.fn} ")
+          when [Point, Num].include?(@fn.fn)
+            @fn.fn
           else
-            @fn + "(" + ops.join(", ") + ")"
+            @fn.fn + "(" + ops.join(", ") + ")"
           end
     "(" + res + ")"
   end
@@ -75,12 +179,15 @@ end
 
 class Expr
   def initialize()
-    @fn = Node.new('+', 2)
+    $level = 0
+    @fn = Node.new(Ternary.new)
+    $level = 0
+    @fn2 = Node.new(Ternary.new)
   end
 
   def to_s
     if @expr.nil?
-      @expr = "std::abs(#{@fn}) - 1.0"
+      @expr = "std::abs(#{@fn}) - std::abs(#{@fn2})"
       @expr.to_s.gsub('num'){ "ValType(#{$rng.rand()}, #{$rng.rand()})" }
     else
       @expr
@@ -106,16 +213,22 @@ num = $seed
 Dir.mkdir("Images") unless Dir.exist?("Images")
 dir = File.join("Images", $seed.to_s)
 Dir.mkdir(dir)
-File.open(File.join(dir, "last_seed.txt"), "w") do |f|
-  f << "Seed: #{$seed}\n"
-end
+log = File.open(File.join(dir, "last_seed.txt"), "w")
+log << "Seed: #{$seed}\n"
 
 loop do
   break if $stop
-  expr = Expr.new.to_s
+  begin
+  expr_tree = Expr.new
+  rescue BadExpr => e
+    next
+  end
+  expr = expr_tree.to_s
   File.open(fracmath, "w") do |f|
     f << ERB.new(File.read(fracmath + ".erb")).result(binding)
   end
+  puts expr
+  log.puts("#{num}: #{expr}")
   res = system("make FracGen && ./FracGen")
   if res.nil?
     fail "Bad make or fracgen"
@@ -125,3 +238,5 @@ loop do
   FileUtils.mv(fi, dir)
   num += 1
 end
+
+log.close

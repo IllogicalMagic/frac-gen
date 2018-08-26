@@ -14,7 +14,7 @@ constexpr int MinY = -500 + OffsetY;
 constexpr int MaxY = 500 + OffsetY;
 constexpr int YLen = MaxY - MinY;
 
-constexpr double Scale = 100.0;
+constexpr double Scale = 20.0;
 
 constexpr int MaxIters = 100;
 
