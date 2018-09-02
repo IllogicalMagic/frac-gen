@@ -6,7 +6,14 @@ require 'pp'
 require 'erb'
 require 'fileutils'
 
-$seed = Time.now.to_i
+options = {}
+OptionParser.new do |opts|
+  opts.on("-s", "--seed NUM", "Generate with initial seed") { |v| options[:seed] = v }
+  opts.on("-e", "--expr EXPR", "Use specified expression with fluctuations") { |v| options[:expr] = v }
+  opts.on("-o", "--out-dir DIR", "Put results into specified directory") { |v| options[:dir] = v }
+end.parse!
+
+$seed = options[:seed].to_i || Time.now.to_i
 $rng = Random.new($seed)
 
 class Func
@@ -207,36 +214,55 @@ Signal.trap("INT") do
   exit(0)
 end
 
-fracmath = 'FracMathSidi.cpp'
+FRACMATH = 'FracMathSidi.cpp'
 
-num = $seed
+$num = $seed
 Dir.mkdir("Images") unless Dir.exist?("Images")
-dir = File.join("Images", $seed.to_s)
-Dir.mkdir(dir)
-log = File.open(File.join(dir, "last_seed.txt"), "w")
-log << "Seed: #{$seed}\n"
+if options[:dir]
+  $dir = options[:dir]
+else
+  $dir = File.join("Images", $seed.to_s)
+  Dir.mkdir($dir)
+end
+$log = File.open(File.join($dir, "last_seed.txt"), "w")
+$log << "Seed: #{$seed}\n"
 
-loop do
-  break if $stop
-  begin
-  expr_tree = Expr.new
-  rescue BadExpr => e
-    next
-  end
-  expr = expr_tree.to_s
-  File.open(fracmath, "w") do |f|
-    f << ERB.new(File.read(fracmath + ".erb")).result(binding)
+def generate_image(expr)
+  File.open(FRACMATH, "w") do |f|
+    f << ERB.new(File.read(FRACMATH + ".erb")).result(binding)
   end
   puts expr
-  log.puts("#{num}: #{expr}")
+  $log.puts("#{$num}: #{expr}")
   res = system("make FracGen && ./FracGen")
   if res.nil?
     fail "Bad make or fracgen"
   end
-  fi = "FractalImage#{num}.png"
+  fi = "FractalImage#{$num}.png"
   File.rename("FractalImage.png", fi)
-  FileUtils.mv(fi, dir)
-  num += 1
+  FileUtils.mv(fi, $dir)
 end
 
-log.close
+if options[:expr].nil?
+  loop do
+    break if $stop
+    begin
+      expr_tree = Expr.new
+    rescue BadExpr => e
+      next
+    end
+    expr = expr_tree.to_s
+    generate_image(expr)
+    $num += 1
+  end
+else
+  expr = options[:expr]
+  subst_num = 0.0
+  loop do
+    expr_subst = expr.sub("NUM", subst_num.to_s)
+    generate_image(expr_subst)
+    subst_num += 0.01
+    $num += 1
+  end
+end
+
+$log.close
