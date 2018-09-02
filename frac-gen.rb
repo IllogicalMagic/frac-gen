@@ -13,7 +13,7 @@ OptionParser.new do |opts|
   opts.on("-o", "--out-dir DIR", "Put results into specified directory") { |v| options[:dir] = v }
 end.parse!
 
-$seed = options[:seed].to_i || Time.now.to_i
+$seed = (options[:seed] || Time.now).to_i
 $rng = Random.new($seed)
 
 class Func
