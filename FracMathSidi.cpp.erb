@@ -1,4 +1,5 @@
 #include "Config.h"
+#include "Norm.h"
 #include "Types.h"
 
 #include <algorithm>
@@ -11,36 +12,6 @@
 #include <cmath>
 
 static FloatType Epsilon {0.05};
-
-static inline
-FloatType norm2(ValType V) {
-  return std::abs(V);
-}
-
-static inline
-FloatType norm1(ValType V) {
-  return std::abs(V.real()) + std::abs(V.imag());
-}
-
-static inline
-FloatType normInf(ValType V) {
-  return std::max(std::abs(V.real()), std::abs(V.imag()));
-}
-
-#define N (1.0/2.0)
-
-// template<int N>
-FloatType normN(ValType V) {
-  return std::pow(std::pow(std::abs(V.real()), (double)N) + std::pow(std::abs(V.imag()), (double)N), 1.0/N);
-}
-
-FloatType normI(ValType V) {
-  return std::pow(std::abs(V.real()), (double)N) + std::pow(std::abs(V.imag()), (double)N);
-}
-
-FloatType normC(ValType V) {
-  return 3.0 * std::abs(V.real()) + std::sqrt(2.0 * std::abs(V.imag()) + std::pow(std::abs(V.real()), 5.0));
-}
 
 // Erroneus steffenson's method.
 static ValType calcNextSteffensonL(std::function<ValType(ValType)> F, ValType Pt) {
