@@ -35,15 +35,18 @@ constexpr T nextPow2() {
 
 using IdxType = unsigned;
 
-template<typename FnTy, typename NormTy, IdxType Degree = 7>
+template<typename FnTy, typename NormTy, typename ColorFnTy, IdxType Degree = 7>
 static PtColor
 getPointIndexGeneralizedSecant(CopyOrRefT<FnTy> Fn,
                                CopyOrRefT<NormTy> Norm,
+                               CopyOrRefT<ColorFnTy> ColorFn,
                                ValType Init) {
   static_assert(std::is_same_v<ValType, decltype(std::declval<FnTy>()(std::declval<ValType>()))>,
                 "Bad function signature");
   static_assert(std::is_same_v<FloatType, decltype(std::declval<NormTy>()(std::declval<ValType>()))>,
                 "Bad norm signature");
+  static_assert(std::is_same_v<double, decltype(std::declval<NormTy>()(std::declval<ValType>()))>,
+                "Bad color function signature");
 
   constexpr IdxType PNum = Degree + 1;
   constexpr IdxType Size = nextPow2<IdxType, PNum>();
@@ -86,7 +89,7 @@ getPointIndexGeneralizedSecant(CopyOrRefT<FnTy> Fn,
       break;
 
     if (Norm(Fn(Pts[Cur])) < Epsilon)
-      return {true, std::arg(Pts[Cur])};
+      return {true, ColorFn(Pts[Cur])};
 
     
     // Renew table.
@@ -108,6 +111,11 @@ void getFractal(std::vector<PtColor> &ColorIdxs) {
   static auto Norm = [](ValType Pt) {
     return normInf(Pt);
   };
+  static auto GetColorFn = [](ValType Init) {
+    return [Init](ValType Pt) -> double {
+      return std::arg(Pt - Init);
+    };
+  };
 
   assert(ColorIdxs.size() == (XLen * YLen) && "Colors size is wrong!");
   ValType Point;
@@ -116,8 +124,10 @@ void getFractal(std::vector<PtColor> &ColorIdxs) {
     FloatType X = static_cast<FloatType>(i) / Scale + CX;
     for (int j = MinY; j < MaxY; ++j) {
       FloatType Y = static_cast<FloatType>(j) / Scale + CY;
+      ValType Init = ValType(X, Y);
       PtColor Val =
-        getPointIndexGeneralizedSecant<decltype(Fn), decltype(Norm)>(Fn, Norm, ValType(X, Y));
+        getPointIndexGeneralizedSecant<decltype(Fn), decltype(Norm), decltype(GetColorFn(Init))>
+        (Fn, Norm, GetColorFn(Init), Init);
       ColorIdxs[Idx++] = Val;
     }
     std::cerr << '.';
