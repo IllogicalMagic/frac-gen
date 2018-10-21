@@ -27,17 +27,28 @@ static ValType calcNextSteffensonL(CopyOrRefT<FnTy> Fn, ValType Pt) {
   return Pt - (Tmp * Tmp) / (Tmp2 - Tmp);
 }
 
-template<typename FnTy,
+template<typename T, T Num, typename = std::enable_if_t<std::is_integral_v<T>, void>>
+constexpr T nextPow2() {
+  static_assert(!(Num & (1 << (sizeof(Num) * 8 - 1))), "Too big number");
+  if (Num == 0)
+    return 1;
+  T Res = 1;
+  while ((Res <<= 1) < Num);
+  return Res;
+}
+
+using IdxType = unsigned;
+
+template<typename FnTy, IdxType Degree = 7,
          typename = std::enable_if_t<
            std::is_same_v<FloatType,
                           decltype(std::declval<FnTy>()(std::declval<ValType>()))>,
            void>>
 static PtColor
 getPointIndexGeneralizedSecant(CopyOrRefT<FnTy> Fn, ValType Init) {
-  constexpr unsigned Size = 8;
-  constexpr unsigned Mask = Size - 1;
-  constexpr unsigned Degree = 7;
-  constexpr unsigned PNum = Degree + 1;
+  constexpr IdxType PNum = Degree + 1;
+  constexpr IdxType Size = nextPow2<IdxType, PNum>();
+  constexpr IdxType Mask = Size - 1;
 
   // TODO: add bootstrap
   ValType Pts[Size] = {Init};
@@ -46,29 +57,29 @@ getPointIndexGeneralizedSecant(CopyOrRefT<FnTy> Fn, ValType Init) {
 
   // Differences window.
   ValType DW[PNum][Size];
-  for (unsigned i = 0; i < PNum; ++i)
+  for (IdxType i = 0; i < PNum; ++i)
     DW[0][i] = Fn(Pts[i]);
 
-  for (unsigned i = 1; i < PNum; ++i)
-    for (unsigned j = i; j < PNum; ++j) {
+  for (IdxType i = 1; i < PNum; ++i)
+    for (IdxType j = i; j < PNum; ++j) {
       DW[i][j] = (DW[i - 1][j] - DW[i - 1][j - 1]) / (Pts[j] - Pts[j - i]);
     }
 
-  unsigned Cur = Degree;
+  IdxType Cur = Degree;
   ValType Diffs[Degree];
-  for (unsigned i = 0; i < Degree; ++i)
+  for (IdxType i = 0; i < Degree; ++i)
     Diffs[i] = Pts[Cur] - Pts[i];
 
   for (int i = 0; i < MaxIters; ++i) {
     ValType Last = DW[Degree][Cur];
     ValType Drv = Last;
-    for (unsigned j = Degree - 1; j > 0; --j) {
+    for (IdxType j = Degree - 1; j > 0; --j) {
       Drv *= Diffs[j - 1];
       Last = DW[j][(Cur - Degree + j) & Mask] + Last * Pts[j];
       Drv += Last;
     }
 
-    unsigned Tmp = Cur;
+    IdxType Tmp = Cur;
     Cur = (Cur + 1) & Mask;
     Pts[Cur] = Pts[Tmp] + DW[0][Tmp] / Drv;
 
@@ -81,7 +92,7 @@ getPointIndexGeneralizedSecant(CopyOrRefT<FnTy> Fn, ValType Init) {
     
     // Renew table.
     DW[0][Cur] = Fn(Pts[Cur]);
-    for (unsigned j = 1; j < PNum; ++j) {
+    for (IdxType j = 1; j < PNum; ++j) {
       DW[j][(Cur + j) & Mask] =
         (DW[j - 1][(Cur + j) & Mask] - DW[j - 1][(Cur + j - 1) & Mask]) /
         (Pts[Cur] - Pts[(Cur - j) & Mask]);
@@ -100,9 +111,9 @@ void getFractal(std::vector<PtColor> &ColorIdxs) {
   ValType Point;
   std::size_t Idx = 0;
   for (int i = MinX; i < MaxX; ++i) {
-    double X = static_cast<double>(i) / Scale + CX;
+    FloatType X = static_cast<FloatType>(i) / Scale + CX;
     for (int j = MinY; j < MaxY; ++j) {
-      double Y = static_cast<double>(j) / Scale + CY;
+      FloatType Y = static_cast<FloatType>(j) / Scale + CY;
       PtColor Val = getPointIndexGeneralizedSecant<decltype(Fn)>(Fn, ValType(X, Y));
       ColorIdxs[Idx++] = Val;
     }
