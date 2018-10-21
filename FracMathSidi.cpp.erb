@@ -1,10 +1,12 @@
 #include "Config.h"
 #include "Norm.h"
+#include "TypeHelpers.hpp"
 #include "Types.h"
 
 #include <algorithm>
 #include <functional>
 #include <iostream>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -14,18 +16,24 @@
 static FloatType Epsilon {0.05};
 
 // Erroneus steffenson's method.
-static ValType calcNextSteffensonL(std::function<ValType(ValType)> F, ValType Pt) {
-  ValType Tmp = F(Pt);
-  ValType Tmp2 = F(Tmp);
+template<typename FnTy,
+         typename = std::enable_if_t<
+           std::is_same_v<FloatType,
+                          decltype(std::declval<FnTy>()(std::declval<ValType>()))>,
+           void>>
+static ValType calcNextSteffensonL(CopyOrRefT<FnTy> Fn, ValType Pt) {
+  ValType Tmp = Fn(Pt);
+  ValType Tmp2 = Fn(Tmp);
   return Pt - (Tmp * Tmp) / (Tmp2 - Tmp);
 }
 
+template<typename FnTy,
+         typename = std::enable_if_t<
+           std::is_same_v<FloatType,
+                          decltype(std::declval<FnTy>()(std::declval<ValType>()))>,
+           void>>
 static PtColor
-getPointIndexGeneralizedSecant(ValType Init) {
-  static auto Fn = [](ValType Pt) {
-    return <%= expr %>;
-  };
-
+getPointIndexGeneralizedSecant(CopyOrRefT<FnTy> Fn, ValType Init) {
   constexpr unsigned Size = 8;
   constexpr unsigned Mask = Size - 1;
   constexpr unsigned Degree = 7;
@@ -34,7 +42,7 @@ getPointIndexGeneralizedSecant(ValType Init) {
   // TODO: add bootstrap
   ValType Pts[Size] = {Init};
   for (unsigned i = 1; i < PNum; ++i)
-    Pts[i] = calcNextSteffensonL(Fn, Pts[i - 1]);
+    Pts[i] = calcNextSteffensonL<decltype(Fn)>(Fn, Pts[i - 1]);
 
   // Differences window.
   ValType DW[PNum][Size];
@@ -84,16 +92,19 @@ getPointIndexGeneralizedSecant(ValType Init) {
 }
 
 void getFractal(std::vector<PtColor> &ColorIdxs) {
+  static auto Fn = [](ValType Pt) {
+    return <%= expr %>;
+  };
+
   assert(ColorIdxs.size() == (XLen * YLen) && "Colors size is wrong!");
   ValType Point;
+  std::size_t Idx = 0;
   for (int i = MinX; i < MaxX; ++i) {
     double X = static_cast<double>(i) / Scale + CX;
     for (int j = MinY; j < MaxY; ++j) {
       double Y = static_cast<double>(j) / Scale + CY;
-      auto Val = getPointIndexGeneralizedSecant(ValType(X, Y));
-      int Idx = (i - MinX) * XLen + (j - MinY);
-      assert(Idx >= 0 && "Idx is less that 0");      
-      ColorIdxs[Idx] = Val;
+      PtColor Val = getPointIndexGeneralizedSecant<decltype(Fn)>(Fn, ValType(X, Y));
+      ColorIdxs[Idx++] = Val;
     }
     std::cerr << '.';
   }
