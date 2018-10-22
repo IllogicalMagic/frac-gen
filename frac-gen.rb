@@ -194,7 +194,7 @@ class Expr
 
   def to_s
     if @expr.nil?
-      @expr = "std::abs(#{@fn}) - std::abs(#{@fn2})"
+      @expr = "std::abs(#{@fn} +#{@fn2}) - 1.0"
       @expr.to_s.gsub('num'){ "ValType(#{$rng.rand()}, #{$rng.rand()})" }
     else
       @expr

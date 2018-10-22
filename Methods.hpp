@@ -28,75 +28,6 @@ constexpr T nextPow2() {
   return Res;
 }
 
-template<typename FnTy, typename NormTy, typename ColorFnTy, IdxType Degree = 7>
-static PtColor
-getPointIndexGeneralizedSecant(CopyOrRefT<FnTy> Fn,
-                               CopyOrRefT<NormTy> Norm,
-                               CopyOrRefT<ColorFnTy> ColorFn,
-                               ValType Init) {
-  static_assert(std::is_same_v<ValType, decltype(std::declval<FnTy>()(std::declval<ValType>()))>,
-                "Bad function signature");
-  static_assert(std::is_same_v<FloatType, decltype(std::declval<NormTy>()(std::declval<ValType>()))>,
-                "Bad norm signature");
-  static_assert(std::is_same_v<double, decltype(std::declval<NormTy>()(std::declval<ValType>()))>,
-                "Bad color function signature");
-
-  constexpr IdxType PNum = Degree + 1;
-  constexpr IdxType Size = nextPow2<IdxType, PNum>();
-  constexpr IdxType Mask = Size - 1;
-
-  // TODO: add bootstrap
-  ValType Pts[Size];
-  Pts[0] = Init;
-  for (unsigned i = 1; i < PNum; ++i)
-    Pts[i] = calcNextSteffensonL<decltype(Fn)>(Fn, Pts[i - 1]);
-
-  // Differences window.
-  ValType DW[PNum][Size];
-  for (IdxType i = 0; i < PNum; ++i)
-    DW[0][i] = Fn(Pts[i]);
-
-  for (IdxType i = 1; i < PNum; ++i)
-    for (IdxType j = i; j < PNum; ++j) {
-      DW[i][j] = (DW[i - 1][j] - DW[i - 1][j - 1]) / (Pts[j] - Pts[j - i]);
-    }
-
-  IdxType Cur = Degree;
-  ValType Diffs[Degree];
-  for (IdxType i = 0; i < Degree; ++i)
-    Diffs[i] = Pts[Cur] - Pts[i];
-
-  for (int i = 0; i < MaxIters; ++i) {
-    ValType Last = DW[Degree][Cur];
-    ValType Drv = Last;
-    for (IdxType j = Degree - 1; j > 0; --j) {
-      Drv *= Diffs[j - 1];
-      Last = DW[j][(Cur - Degree + j) & Mask] + Last * Pts[j];
-      Drv += Last;
-    }
-
-    IdxType Tmp = Cur;
-    Cur = (Cur + 1) & Mask;
-    Pts[Cur] = Pts[Tmp] + DW[0][Tmp] / Drv;
-
-    if (std::isnan(Pts[Cur].real()) || std::isnan(Pts[Cur].imag()))
-      break;
-
-    if (Norm(Fn(Pts[Cur])) < Epsilon)
-      return {true, ColorFn(Pts[Cur])};
-
-    // Renew table.
-    DW[0][Cur] = Fn(Pts[Cur]);
-    for (IdxType j = 1; j < PNum; ++j) {
-      DW[j][(Cur + j) & Mask] =
-        (DW[j - 1][(Cur + j) & Mask] - DW[j - 1][(Cur + j - 1) & Mask]) /
-        (Pts[Cur] - Pts[(Cur - j) & Mask]);
-    }
-  }
-
-  return {false, 0.0};
-}
-
 template<IdxType Mask>
 struct IdxGetT {
 private:
@@ -107,18 +38,74 @@ public:
   void operator++() { Cur = (Cur + 1) & Mask; }
 };
 
+template<typename FnT, typename NormT, IdxType Degree = 7>
+struct CalcNextSidi {
+  static constexpr IdxType UsedPts = Degree + 1;
+  static constexpr IdxType StorageSize = nextPow2<IdxType, UsedPts>();
+
+  using IdxGetTy = IdxGetT<StorageSize - 1>;
+  using FnTy = CopyOrRefT<FnT>;
+  using NormTy = CopyOrRefT<NormT>;
+
+private:
+  static constexpr IdxType PNum = UsedPts;
+  // Differences window.
+  ValType DW[PNum][StorageSize];
+  ValType Diffs[Degree];
+
+public:
+  CalcNextSidi(FnTy Fn, ValType Pts[]) {
+    for (IdxType i = 0; i < PNum; ++i)
+      DW[0][i] = Fn(Pts[i]);
+
+    for (IdxType i = 1; i < PNum; ++i)
+      for (IdxType j = i; j < PNum; ++j) {
+        DW[i][j] = (DW[i - 1][j] - DW[i - 1][j - 1]) / (Pts[j] - Pts[j - i]);
+      }
+
+    for (IdxType i = 0; i < Degree; ++i)
+      Diffs[i] = Pts[Degree] - Pts[i];
+  }
+
+  ValType get(FnTy Fn, NormTy Norm,
+              ValType Pts[], IdxGetTy IdxGet) {
+    IdxType Cur = IdxGet(Degree);
+
+    ValType Last = DW[Degree][Cur];
+    ValType Drv = Last;
+    for (IdxType j = Degree - 1; j > 0; --j) {
+      Drv *= Diffs[j - 1];
+      Last = DW[j][IdxGet(j)] + Last * Pts[j]; // Probably an error. TODO: check.
+      Drv += Last;
+    }
+
+    return Pts[Cur] + DW[0][Cur] / Drv;
+  }
+
+  void update(FnTy Fn, ValType Pts[], IdxGetTy IdxGet) {
+    // Renew table.
+    DW[0][IdxGet(Degree)] = Fn(Pts[IdxGet(Degree)]);
+    for (IdxType j = 1; j < PNum; ++j) {
+      DW[j][IdxGet(Degree + j)] =
+        (DW[j - 1][IdxGet(Degree + j)] - DW[j - 1][IdxGet(Degree + j - 1)]) /
+        (Pts[IdxGet(Degree)] - Pts[IdxGet(Degree - j)]);
+    }
+  }
+};
+
 template<typename FnT, typename NormT>
 struct CalcNextMuller {
   static constexpr IdxType UsedPts = 3;
   static constexpr IdxType StorageSize = nextPow2<IdxType, UsedPts>();
 
   using IdxGetTy = IdxGetT<StorageSize - 1>;
-  using FnTy = FnT;
-  using NormTy = NormT;
+  using FnTy = CopyOrRefT<FnT>;
+  using NormTy = CopyOrRefT<NormT>;
 
-  static ValType get(CopyOrRefT<FnTy> Fn,
-                     CopyOrRefT<NormTy> Norm,
-                     ValType Pts[], IdxGetTy IdxGet) {
+  CalcNextMuller(FnTy Fn, ValType Pts[]) {}
+
+  ValType get(FnTy Fn, NormTy Norm,
+              ValType Pts[], IdxGetTy IdxGet) {
     ValType P0 = Pts[IdxGet(0)];
     ValType P1 = Pts[IdxGet(1)];
     ValType P2 = Pts[IdxGet(2)];
@@ -138,12 +125,14 @@ struct CalcNextMuller {
     return P2 - 2.0 * F2 / Den;
   }
 
+  void update(FnTy Fn, ValType Pts[], IdxGetTy IdxGet) {}
+
 };
 
 template<typename Method, typename ColorFnTy>
 static PtColor
-getPointIndexN(CopyOrRefT<typename Method::FnTy> Fn,
-               CopyOrRefT<typename Method::NormTy> Norm,
+getPointIndexN(typename Method::FnTy Fn,
+               typename Method::NormTy Norm,
                CopyOrRefT<ColorFnTy> ColorFn,
                ValType Init) {
   constexpr IdxType UsedPts = Method::UsedPts;
@@ -154,9 +143,11 @@ getPointIndexN(CopyOrRefT<typename Method::FnTy> Fn,
   for (unsigned i = 1; i < UsedPts; ++i)
     Pts[i] = calcNextSteffensonL<decltype(Fn)>(Fn, Pts[i - 1]);
 
+  Method Mth(Fn, Pts);
+
   typename Method::IdxGetTy IdxGet;
   for (int i = 0; i < MaxIters; ++i) {
-    ValType Next = Method::get(Fn, Norm, Pts, IdxGet);
+    ValType Next = Mth.get(Fn, Norm, Pts, IdxGet);
     if (std::isnan(Next.real()) || std::isnan(Next.imag()))
       break;
 
@@ -165,6 +156,8 @@ getPointIndexN(CopyOrRefT<typename Method::FnTy> Fn,
 
     ++IdxGet;
     Pts[IdxGet(UsedPts)] = Next;
+
+    Mth.update(Fn, Pts, IdxGet);
   }
 
   return {false, 0.0};
