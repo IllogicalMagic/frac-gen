@@ -7,7 +7,8 @@
 using FloatType = double;
 using ValType = std::complex<FloatType>;
 
-/* using PtColor = std::pair<int, unsigned>; */
 using PtColor = std::pair<bool, double>;
+
+using IdxType = unsigned;
 
 #endif

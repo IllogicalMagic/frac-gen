@@ -1,21 +1,16 @@
+#ifndef FRACGEN_ITER_METHODS_DEFINED__
+#define FRACGEN_ITER_METHODS_DEFINED__
+
 #include "Config.h"
-#include "Norm.h"
 #include "TypeHelpers.hpp"
 #include "Types.h"
 
-#include <algorithm>
-#include <functional>
-#include <iostream>
 #include <type_traits>
 #include <utility>
-#include <vector>
 
-#include <cassert>
 #include <cmath>
 
-static FloatType Epsilon {0.05};
-
-// Erroneus steffenson's method.
+// Erroneus steffenson's method. Helper for bootstrap stages.
 template<typename FnTy>
 static ValType calcNextSteffensonL(CopyOrRefT<FnTy> Fn, ValType Pt) {
   ValType Tmp = Fn(Pt);
@@ -32,8 +27,6 @@ constexpr T nextPow2() {
   while ((Res <<= 1) < Num);
   return Res;
 }
-
-using IdxType = unsigned;
 
 template<typename FnTy, typename NormTy, typename ColorFnTy, IdxType Degree = 7>
 static PtColor
@@ -53,7 +46,8 @@ getPointIndexGeneralizedSecant(CopyOrRefT<FnTy> Fn,
   constexpr IdxType Mask = Size - 1;
 
   // TODO: add bootstrap
-  ValType Pts[Size] = {Init};
+  ValType Pts[Size];
+  Pts[0] = Init;
   for (unsigned i = 1; i < PNum; ++i)
     Pts[i] = calcNextSteffensonL<decltype(Fn)>(Fn, Pts[i - 1]);
 
@@ -91,7 +85,6 @@ getPointIndexGeneralizedSecant(CopyOrRefT<FnTy> Fn,
     if (Norm(Fn(Pts[Cur])) < Epsilon)
       return {true, ColorFn(Pts[Cur])};
 
-    
     // Renew table.
     DW[0][Cur] = Fn(Pts[Cur]);
     for (IdxType j = 1; j < PNum; ++j) {
@@ -104,33 +97,77 @@ getPointIndexGeneralizedSecant(CopyOrRefT<FnTy> Fn,
   return {false, 0.0};
 }
 
-void getFractal(std::vector<PtColor> &ColorIdxs) {
-  static auto Fn = [](ValType Pt) -> ValType {
-    return <%= expr %>;
-  };
-  static auto Norm = [](ValType Pt) {
-    return normInf(Pt);
-  };
-  static auto GetColorFn = [](ValType Init) {
-    return [Init](ValType Pt) -> double {
-      return std::arg(Pt - Init);
-    };
-  };
+template<IdxType Mask>
+struct IdxGetT {
+private:
+  IdxType Cur = 0;
+public:
+  IdxGetT() = default;
+  IdxType operator()(IdxType Idx) { return (Cur + Idx) & Mask; }
+  void operator++() { Cur = (Cur + 1) & Mask; }
+};
 
-  assert(ColorIdxs.size() == (XLen * YLen) && "Colors size is wrong!");
-  ValType Point;
-  std::size_t Idx = 0;
-  for (int i = MinX; i < MaxX; ++i) {
-    FloatType X = static_cast<FloatType>(i) / Scale + CX;
-    for (int j = MinY; j < MaxY; ++j) {
-      FloatType Y = static_cast<FloatType>(j) / Scale + CY;
-      ValType Init = ValType(X, Y);
-      PtColor Val =
-        getPointIndexGeneralizedSecant<decltype(Fn), decltype(Norm), decltype(GetColorFn(Init))>
-        (Fn, Norm, GetColorFn(Init), Init);
-      ColorIdxs[Idx++] = Val;
-    }
-    std::cerr << '.';
+template<typename FnT, typename NormT>
+struct CalcNextMuller {
+  static constexpr IdxType UsedPts = 3;
+  static constexpr IdxType StorageSize = nextPow2<IdxType, UsedPts>();
+
+  using IdxGetTy = IdxGetT<StorageSize - 1>;
+  using FnTy = FnT;
+  using NormTy = NormT;
+
+  static ValType get(CopyOrRefT<FnTy> Fn,
+                     CopyOrRefT<NormTy> Norm,
+                     ValType Pts[], IdxGetTy IdxGet) {
+    ValType P0 = Pts[IdxGet(0)];
+    ValType P1 = Pts[IdxGet(1)];
+    ValType P2 = Pts[IdxGet(2)];
+
+    ValType F0 = Fn(P0);
+    ValType F1 = Fn(P1);
+    ValType F2 = Fn(P2);
+
+    ValType F21 = (F2 - F1) / (P2 - P1);
+    ValType F20 = (F2 - F0) / (P2 - P0);
+    ValType F10 = (F1 - F0) / (P1 - P0);
+    ValType F210 = (F21 - F10) / (P2 - P0);
+  
+    ValType W = F21 + F20 + F10;
+    ValType Den = std::sqrt(W * W - 4.0 * F2 * F210);
+    Den = std::fmax(Norm(W - Den), Norm(W + Den));
+    return P2 - 2.0 * F2 / Den;
   }
-  std::cerr << '\n';
+
+};
+
+template<typename Method, typename ColorFnTy>
+static PtColor
+getPointIndexN(CopyOrRefT<typename Method::FnTy> Fn,
+               CopyOrRefT<typename Method::NormTy> Norm,
+               CopyOrRefT<ColorFnTy> ColorFn,
+               ValType Init) {
+  constexpr IdxType UsedPts = Method::UsedPts;
+  constexpr IdxType Size = Method::StorageSize;
+
+  ValType Pts[Size];
+  Pts[0] = Init;
+  for (unsigned i = 1; i < UsedPts; ++i)
+    Pts[i] = calcNextSteffensonL<decltype(Fn)>(Fn, Pts[i - 1]);
+
+  typename Method::IdxGetTy IdxGet;
+  for (int i = 0; i < MaxIters; ++i) {
+    ValType Next = Method::get(Fn, Norm, Pts, IdxGet);
+    if (std::isnan(Next.real()) || std::isnan(Next.imag()))
+      break;
+
+    if (Norm(Fn(Next)) < Epsilon)
+      return {true, ColorFn(Next)};
+
+    ++IdxGet;
+    Pts[IdxGet(UsedPts)] = Next;
+  }
+
+  return {false, 0.0};
 }
+
+#endif

@@ -214,7 +214,7 @@ Signal.trap("INT") do
   exit(0)
 end
 
-FRACMATH = 'FracMathSidi.cpp'
+FRACMATH = 'FracMath.cpp'
 
 $num = $seed
 Dir.mkdir("Images") unless Dir.exist?("Images")

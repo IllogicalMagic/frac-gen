@@ -9,11 +9,11 @@ all: FracGen
 
 Drawer.o: Drawer.cpp Drawer.h Config.h
 
-FracGen.o: FracGen.cpp
+FracGen.o: FracGen.cpp Types.h
 
-FracMathSidi.o: FracMathSidi.cpp
+FracMath.o: FracMath.cpp Config.h Types.h Methods.hpp
 
-FracGen: FracGen.o FracMathSidi.o Drawer.o
+FracGen: FracGen.o FracMath.o Drawer.o
 	$(CXX) $(LDFLAGS) $(LDLIBS) $^ -o $@
 
 clean:

@@ -20,4 +20,6 @@ constexpr FloatType Scale = 20.0;
 
 constexpr int MaxIters = 100;
 
+constexpr FloatType Epsilon = 0.05;
+
 #endif

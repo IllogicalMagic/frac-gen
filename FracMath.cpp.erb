@@ -1,0 +1,44 @@
+#include "Config.h"
+#include "Norm.h"
+#include "Methods.hpp"
+#include "TypeHelpers.hpp"
+#include "Types.h"
+
+#include <iostream>
+#include <utility>
+#include <vector>
+
+#include <cassert>
+#include <cmath>
+
+void getFractal(std::vector<PtColor> &ColorIdxs) {
+  static auto Fn = [](ValType Pt) -> ValType {
+    return <%= expr %>;
+  };
+  static auto Norm = [](ValType Pt) {
+    return normInf(Pt);
+  };
+  static auto GetColorFn = [](ValType Init) {
+    return [Init](ValType Pt) -> double {
+      return std::arg(Pt - Init);
+    };
+  };
+
+  using Method = CalcNextMuller<decltype(Fn), decltype(Norm)>;
+
+  assert(ColorIdxs.size() == (XLen * YLen) && "Colors size is wrong!");
+  ValType Point;
+  std::size_t Idx = 0;
+  for (int i = MinX; i < MaxX; ++i) {
+    FloatType X = static_cast<FloatType>(i) / Scale + CX;
+    for (int j = MinY; j < MaxY; ++j) {
+      FloatType Y = static_cast<FloatType>(j) / Scale + CY;
+      ValType Init = ValType(X, Y);
+      PtColor Val =
+        getPointIndexN<Method, decltype(GetColorFn(Init))>(Fn, Norm, GetColorFn(Init), Init);
+      ColorIdxs[Idx++] = Val;
+    }
+    std::cerr << '.';
+  }
+  std::cerr << '\n';
+}
