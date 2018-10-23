@@ -11,7 +11,17 @@ OptionParser.new do |opts|
   opts.on("-s", "--seed NUM", "Generate with initial seed") { |v| options[:seed] = v }
   opts.on("-e", "--expr EXPR", "Use specified expression with fluctuations") { |v| options[:expr] = v }
   opts.on("-o", "--out-dir DIR", "Put results into specified directory") { |v| options[:dir] = v }
+  opts.on("-m", "--method METHOD", "Iterative method name") { |v| options[:method] = v }
 end.parse!
+
+case options[:method].to_s.downcase
+when "sidi", ""
+  $method = "Sidi"
+when "muller"
+  $method = "Muller"
+else
+  fail "Unknown method"
+end
 
 $seed = (options[:seed] || Time.now).to_i
 $rng = Random.new($seed)
@@ -194,7 +204,9 @@ class Expr
 
   def to_s
     if @expr.nil?
-      @expr = "std::abs(#{@fn} +#{@fn2}) - 1.0"
+      @expr = "ValType Fn1 = #{@fn};\n"
+      @expr += "ValType Fn2 = #{@fn2};\n"
+      @expr += "return std::abs(Fn1 * (std::abs(-Pt * Pt + std::pow(Pt, 3.5)) < 1.0 ? Fn1 : (1.0 / Fn2))) - std::abs(Fn2);"
       @expr.to_s.gsub('num'){ "ValType(#{$rng.rand()}, #{$rng.rand()})" }
     else
       @expr
@@ -221,13 +233,14 @@ Dir.mkdir("Images") unless Dir.exist?("Images")
 if options[:dir]
   $dir = options[:dir]
 else
-  $dir = File.join("Images", $seed.to_s)
+  $dir = File.join("Images", "#{$seed.to_s}_#{$method}")
   Dir.mkdir($dir)
 end
 $log = File.open(File.join($dir, "last_seed.txt"), "w")
 $log << "Seed: #{$seed}\n"
 
 def generate_image(expr)
+  method = $method
   File.open(FRACMATH, "w") do |f|
     f << ERB.new(File.read(FRACMATH + ".erb")).result(binding)
   end

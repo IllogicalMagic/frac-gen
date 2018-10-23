@@ -13,18 +13,18 @@
 
 void getFractal(std::vector<PtColor> &ColorIdxs) {
   static auto Fn = [](ValType Pt) -> ValType {
-    return <%= expr %>;
+    <%= expr %>
   };
   static auto Norm = [](ValType Pt) {
     return norm2(Pt);
   };
   static auto GetColorFn = [](ValType Init) {
     return [Init](ValType Pt) -> double {
-      return std::arg(Pt - Init);
+      return std::arg(std::pow(Pt, Init) * Pt);
     };
   };
 
-  using Method = CalcNextSidi<decltype(Fn), decltype(Norm)>;
+  using Method = CalcNext<%= method %><decltype(Fn), decltype(Norm)>;
 
   assert(ColorIdxs.size() == (XLen * YLen) && "Colors size is wrong!");
   ValType Point;
