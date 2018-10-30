@@ -43,7 +43,6 @@ struct CalcNextSidi {
   static constexpr IdxType UsedPts = Degree + 1;
   static constexpr IdxType StorageSize = nextPow2<IdxType, UsedPts>();
 
-  using IdxGetTy = IdxGetT<StorageSize - 1>;
   using FnTy = CopyOrRefT<FnT>;
   using NormTy = CopyOrRefT<NormT>;
 
@@ -54,7 +53,7 @@ private:
   ValType Diffs[Degree];
 
 public:
-  CalcNextSidi(FnTy Fn, ValType Pts[]) {
+  CalcNextSidi(FnTy Fn, const ValType Pts[]) {
     for (IdxType i = 0; i < PNum; ++i)
       DW[0][i] = Fn(Pts[i]);
 
@@ -67,8 +66,9 @@ public:
       Diffs[i] = Pts[Degree] - Pts[i];
   }
 
+  template<typename IdxGetTy>
   ValType get(FnTy Fn, NormTy Norm,
-              ValType Pts[], IdxGetTy IdxGet) {
+              const ValType Pts[], IdxGetTy IdxGet) {
     IdxType Cur = IdxGet(Degree);
 
     ValType Last = DW[Degree][Cur];
@@ -82,7 +82,8 @@ public:
     return Pts[Cur] + DW[0][Cur] / Drv;
   }
 
-  void update(FnTy Fn, ValType Pts[], IdxGetTy IdxGet) {
+  template<typename IdxGetTy>
+  void update(FnTy Fn, const ValType Pts[], IdxGetTy IdxGet) {
     // Renew table.
     DW[0][IdxGet(Degree)] = Fn(Pts[IdxGet(Degree)]);
     for (IdxType j = 1; j < PNum; ++j) {
@@ -98,14 +99,14 @@ struct CalcNextMuller {
   static constexpr IdxType UsedPts = 3;
   static constexpr IdxType StorageSize = nextPow2<IdxType, UsedPts>();
 
-  using IdxGetTy = IdxGetT<StorageSize - 1>;
   using FnTy = CopyOrRefT<FnT>;
   using NormTy = CopyOrRefT<NormT>;
 
-  CalcNextMuller(FnTy Fn, ValType Pts[]) {}
+  CalcNextMuller(FnTy Fn, const ValType Pts[]) {}
 
+  template<typename IdxGetTy>
   ValType get(FnTy Fn, NormTy Norm,
-              ValType Pts[], IdxGetTy IdxGet) {
+              const ValType Pts[], IdxGetTy IdxGet) {
     ValType P0 = Pts[IdxGet(0)];
     ValType P1 = Pts[IdxGet(1)];
     ValType P2 = Pts[IdxGet(2)];
@@ -125,8 +126,8 @@ struct CalcNextMuller {
     return P2 - 2.0 * F2 / Den;
   }
 
-  void update(FnTy Fn, ValType Pts[], IdxGetTy IdxGet) {}
-
+  template<typename IdxGetTy>
+  void update(FnTy Fn, const ValType Pts[], IdxGetTy IdxGet) {}
 };
 
 template<typename Method, typename ColorFnTy>
@@ -145,7 +146,7 @@ getPointIndexN(typename Method::FnTy Fn,
 
   Method Mth(Fn, Pts);
 
-  typename Method::IdxGetTy IdxGet;
+  IdxGetT<Size - 1> IdxGet;
   for (int i = 0; i < MaxIters; ++i) {
     ValType Next = Mth.get(Fn, Norm, Pts, IdxGet);
     if (std::isnan(Next.real()) || std::isnan(Next.imag()))
