@@ -6,6 +6,7 @@
 #include "TypeHelpers.hpp"
 #include "Types.h"
 
+#include <random>
 #include <type_traits>
 #include <utility>
 
@@ -34,6 +35,18 @@ private:
 
   // Differences window.
   // Should it be separated into another class???
+  // DW has following structure (example for 4 points):
+  // f0    f1    f2    f3
+  //       f10   f21   f32
+  //            f210  f321
+  //                  f3210
+  // To add next point just forget diagonal elements
+  // and update next column using previous elements:
+  //  f4    f1    f2    f3
+  //  f43         f21   f32
+  // f432              f321
+  // f4321
+  // Guaranteed to be fast and correct.
   ValType DW[PNum][StorageSize];
   IdxType DWPos = 0;
   ValType Diffs[Degree];
@@ -66,11 +79,21 @@ public:
   ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
     IdxType Cur = getDWIdx(Degree);
 
+    // Calculation of polynomial derivative at given point.
+    // The following was noticed:
+    // Poly in Newton's form can be rewritten as:
+    // f0 + (x - x0)(f10 + (x - x1)(f210 + (x - x2)(f321 + ...))).
+    // It has repetitive pattern so it can be recursively calculated
+    // starting from innermost expression.
+    // Example for 4 points:
+    // [f10 + (x - x1)(f210 + (x - x2)f3210)] +
+    //  f10(x - x0)([f210 + (x - x2)f3210] +
+    //               f210(x - x1)[f3210]).
     ValType Last = DW[Degree][Cur];
     ValType Drv = Last;
     for (IdxType j = Degree - 1; j > 0; --j) {
-      Drv *= Diffs[j - 1];
-      Last = DW[j][getDWIdx(j)] + Last * Pts[j]; // Definitely an error. TODO: fix.
+      Drv *= Diffs[j - 1] * DW[j][getDWIdx(j)];
+      Last = DW[j][getDWIdx(j)] + Diffs[j] * Last;
       Drv += Last;
     }
 
@@ -80,14 +103,19 @@ public:
   template<typename PtCont>
   void update(FnTy Fn, const PtCont &Pts) {
     advanceDWIdx();
+
+    for (IdxType i = 0; i < Degree; ++i)
+      Diffs[i] = Pts[Degree] - Pts[i];
+
     // Renew table.
-    // TODO: check all indices.
+    // Just update one last column.
     DW[0][getDWIdx(Degree)] = Fn(Pts[Degree]);
     for (IdxType j = 1; j < PNum; ++j) {
-      DW[j][getDWIdx(Degree + j)] =
-        (DW[j - 1][getDWIdx(Degree + j)] - DW[j - 1][getDWIdx(Degree + j - 1)]) /
-        (Pts[Degree] - Pts[Degree - j]);
+      DW[j][getDWIdx(Degree)] =
+        (DW[j - 1][getDWIdx(Degree)] - DW[j - 1][getDWIdx(Degree - j)]) /
+        (Diffs[Degree - j]);
     }
+
   }
 };
 
