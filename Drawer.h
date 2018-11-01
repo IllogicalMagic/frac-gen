@@ -6,6 +6,6 @@
 
 #include "Types.h"
 
-void drawFractal(const std::vector<PtColor> &ColorIdx);
+void drawFractal(const std::vector<PtColor> ColorIdx);
 
 #endif

@@ -4,12 +4,9 @@
 
 #include <vector>
 
-void getFractal(std::vector<PtColor> &ColorIdxs);
+std::vector<PtColor> getFractal();
 
 int main(int argc, char** argv) {
-  std::vector<PtColor> ColorIdx;
-  ColorIdx.resize(XLen * YLen);
-  getFractal(ColorIdx);
-  drawFractal(ColorIdx);
+  drawFractal(getFractal());
   return 0;
 }

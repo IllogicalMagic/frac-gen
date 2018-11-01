@@ -10,7 +10,7 @@ using namespace Magick;
 
 static constexpr double pi23 = 2.094395102;
 
-void drawFractal(const std::vector<PtColor> &ColorIdxs) {
+auto drawFractal(const std::vector<PtColor> ColorIdxs) -> void {
   Image Fractal(Geometry(XLen, YLen), "black");
   Fractal.magick("png");
 

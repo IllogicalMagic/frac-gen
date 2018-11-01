@@ -11,34 +11,34 @@
 #include <cassert>
 #include <cmath>
 
-void getFractal(std::vector<PtColor> &ColorIdxs) {
+auto getFractal() -> std::vector<PtColor> {
+  std::vector<PtColor> ColorIdxs;
+  ColorIdxs.reserve(XLen * YLen);
+
   static auto Fn = [](ValType Pt) -> ValType {
     <%= expr %>
   };
   static auto Norm = [](ValType Pt) {
     return norm2(Pt);
   };
-  static auto GetColorFn = [](ValType Init) {
-    return [Init](ValType Pt) -> double {
-      return std::arg(std::pow(Pt, Init) * Pt);
-    };
+  static auto ColorFn = [](ValType Pt) -> double {
+    return std::arg(Pt);
   };
 
   using Method = CalcNext<%= method %><decltype(Fn), decltype(Norm)>;
 
-  assert(ColorIdxs.size() == (XLen * YLen) && "Colors size is wrong!");
-  ValType Point;
-  std::size_t Idx = 0;
   for (int i = MinX; i < MaxX; ++i) {
     FloatType X = static_cast<FloatType>(i) / Scale + CX;
     for (int j = MinY; j < MaxY; ++j) {
       FloatType Y = static_cast<FloatType>(j) / Scale + CY;
       ValType Init = ValType(X, Y);
       PtColor Val =
-        getPointIndexN<Method, decltype(GetColorFn(Init))>(Fn, Norm, GetColorFn(Init), Init);
-      ColorIdxs[Idx++] = Val;
+        getPointIndexN<Method, decltype(ColorFn)>(Fn, Norm, ColorFn, Init);
+      ColorIdxs.push_back(Val);
     }
     std::cerr << '.';
   }
   std::cerr << '\n';
+
+  return ColorIdxs;
 }
