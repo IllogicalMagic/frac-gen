@@ -6,6 +6,7 @@
 #include "TypeHelpers.hpp"
 #include "Types.h"
 
+#include <functional>
 #include <random>
 #include <type_traits>
 #include <utility>
@@ -14,18 +15,15 @@
 
 // Erroneus steffenson's method. Helper for bootstrap stages.
 template<typename FnTy>
-static ValType calcNextSteffensonL(CopyOrRefT<FnTy> Fn, ValType Pt) {
+static ValType calcNextSteffensonL(FnTy Fn, ValType Pt) {
   ValType Tmp = Fn(Pt);
   ValType Tmp2 = Fn(Tmp);
   return Pt - (Tmp * Tmp) / (Tmp2 - Tmp);
 }
 
-template<typename FnT, typename NormT, IdxType Degree = 7>
+template<IdxType Degree = 7>
 struct CalcNextSidi {
   static constexpr IdxType UsedPts = Degree + 1;
-
-  using FnTy = CopyOrRefT<FnT>;
-  using NormTy = CopyOrRefT<NormT>;
 
 private:
   static constexpr IdxType PNum = UsedPts;
@@ -51,8 +49,8 @@ private:
   IdxType DWPos = 0;
   ValType Diffs[Degree];
 
-  IdxType getDWIdx(IdxType Idx) {
-    // TODO: fix indices and add an assertion.
+  IdxType getDWIdx(IdxType Idx) const {
+    assert(Idx < PNum && "Idx is out of range");
     return (DWPos + Idx) & Mask;
   }
 
@@ -61,7 +59,7 @@ private:
   }
 
 public:
-  template<typename PtCont>
+  template<typename FnTy, typename PtCont>
   CalcNextSidi(FnTy Fn, const PtCont &Pts) {
     for (IdxType i = 0; i < PNum; ++i)
       DW[0][i] = Fn(Pts[i]);
@@ -75,7 +73,7 @@ public:
       Diffs[i] = Pts[Degree] - Pts[i];
   }
 
-  template<typename PtCont>
+  template<typename FnTy, typename NormTy, typename PtCont>
   ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
     IdxType Cur = getDWIdx(Degree);
 
@@ -100,7 +98,7 @@ public:
     return Pts[Degree] + DW[0][Cur] / Drv;
   }
 
-  template<typename PtCont>
+  template<typename FnTy, typename PtCont>
   void update(FnTy Fn, const PtCont &Pts) {
     advanceDWIdx();
 
@@ -119,17 +117,13 @@ public:
   }
 };
 
-template<typename FnT, typename NormT>
 struct CalcNextMuller {
   static constexpr IdxType UsedPts = 3;
 
-  using FnTy = CopyOrRefT<FnT>;
-  using NormTy = CopyOrRefT<NormT>;
-
-  template<typename PtCont>
+  template<typename FnTy, typename PtCont>
   CalcNextMuller(FnTy Fn, const PtCont &Pts) {}
 
-  template<typename PtCont>
+  template<typename FnTy, typename NormTy, typename PtCont>
   ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
     ValType P0 = Pts[0];
     ValType P1 = Pts[1];
@@ -150,21 +144,53 @@ struct CalcNextMuller {
     return P2 - 2.0 * F2 / Den;
   }
 
-  template<typename PtCont>
+  template<typename FnTy, typename PtCont>
   void update(FnTy Fn, const PtCont &Pts) {}
 };
 
-template<typename Method, typename ColorFnTy>
+template<typename I, typename... Methods>
+struct CalcNextMixed;
+
+template<size_t... Probs, typename... Methods>
+struct CalcNextMixed<std::index_sequence<Probs...>, Methods...> : Methods... {
+  static_assert(sizeof...(Probs) == sizeof...(Methods), "Wrong mixed parameters");
+  static constexpr IdxType UsedPts = std::max({Methods::UsedPts...});
+
+  template<typename FnTy, typename PtCont>
+  CalcNextMixed(FnTy Fn, const PtCont &Pts): Methods(Fn, Pts)... {}
+
+private:
+  template<typename T, typename FnTy, typename NormTy, typename PtCont>
+  ValType lambdaHelper(FnTy Fn, NormTy Norm, const PtCont &Pt) {
+    return this->T::get(Fn, Norm, Pt);
+  }
+
+public:
+  template<typename FnTy, typename NormTy, typename PtCont>
+  ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
+    static std::mt19937 Rnd(static_cast<unsigned>(Norm(Fn(Pts[0]))));
+    static std::discrete_distribution<size_t> Distr({Probs...});
+    using HelperTy = ValType (CalcNextMixed::*)(FnTy, NormTy, const PtCont &);
+    static const HelperTy MethArr[] = {&CalcNextMixed::lambdaHelper<Methods, FnTy, NormTy, PtCont>...};
+
+    return (this->*MethArr[Distr(Rnd)])(Fn, Norm, Pts);
+  }
+
+  template<typename FnTy, typename PtCont>
+  void update(FnTy Fn, const PtCont &Pts) {
+    int X[] = {(this->Methods::update(Fn, Pts), 0)...};
+    (void) X;
+  }
+};
+
+template<typename Method, typename FnTy, typename NormTy, typename ColorFnTy>
 static PtColor
-getPointIndexN(typename Method::FnTy Fn,
-               typename Method::NormTy Norm,
-               CopyOrRefT<ColorFnTy> ColorFn,
-               ValType Init) {
+getPointIndexN(FnTy Fn, NormTy Norm, ColorFnTy ColorFn, ValType Init) {
   constexpr IdxType UsedPts = Method::UsedPts;
 
   CircularBuffer<ValType, UsedPts> Pts([Fn, Pt = Init]() mutable -> ValType {
       ValType Old = Pt;
-      Pt = calcNextSteffensonL<decltype(Fn)>(Fn, Pt);
+      Pt = calcNextSteffensonL(Fn, Pt);
       return Old;
     });
 

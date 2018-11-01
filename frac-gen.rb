@@ -14,11 +14,15 @@ OptionParser.new do |opts|
   opts.on("-m", "--method METHOD", "Iterative method name") { |v| options[:method] = v }
 end.parse!
 
+$params = []
 case options[:method].to_s.downcase
 when "sidi", ""
   $method = "Sidi"
 when "muller"
   $method = "Muller"
+when "mixed"
+  $method = "Mixed"
+  $params = ["std::index_sequence<10, 5>", "Sidi<4>", "Muller"]
 else
   fail "Unknown method"
 end
@@ -206,7 +210,7 @@ class Expr
     if @expr.nil?
       @expr = "ValType Fn1 = #{@fn};\n"
       @expr += "ValType Fn2 = #{@fn2};\n"
-      @expr += "return std::abs(Fn1 * (std::abs(-Pt * Pt + std::pow(Pt, 3.5)) < 1.0 ? Fn1 : (1.0 / Fn2))) - std::abs(Fn2);"
+      @expr += "return std::abs(Fn1 - Fn2) - 1.0;"
       @expr.to_s.gsub('num'){ "ValType(#{$rng.rand()}, #{$rng.rand()})" }
     else
       @expr
@@ -241,6 +245,13 @@ $log << "Seed: #{$seed}\n"
 
 def generate_image(expr)
   method = $method
+  if $params.empty?
+    method_params = ""
+  else
+    method_params = [$params[0]] + $params[1..-1].map{ |p| "CalcNext#{p}" }
+    method_params = method_params.join(", ")
+    method_params = "<#{method_params}>"
+  end
   File.open(FRACMATH, "w") do |f|
     f << ERB.new(File.read(FRACMATH + ".erb")).result(binding)
   end
