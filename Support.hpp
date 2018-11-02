@@ -49,6 +49,14 @@ public:
     return Data[getIdx(Idx)];
   }
 
+  const T &front() const {
+    return Data[Begin];
+  }
+
+  T &front() {
+    return Data[Begin];
+  }
+
   void push_back(const T &Val) {
     Begin = getIdx(1);
     (*this)[Size - 1] = Val;

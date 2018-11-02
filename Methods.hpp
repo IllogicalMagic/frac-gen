@@ -13,13 +13,23 @@
 
 #include <cmath>
 
-// Erroneus steffenson's method. Helper for bootstrap stages.
-template<typename FnTy>
-static ValType calcNextSteffensonL(FnTy Fn, ValType Pt) {
-  ValType Tmp = Fn(Pt);
-  ValType Tmp2 = Fn(Tmp);
-  return Pt - (Tmp * Tmp) / (Tmp2 - Tmp);
-}
+// Steffenson's method. Helper for bootstrap stages.
+struct CalcNextSteffenson {
+  static constexpr IdxType UsedPts = 1;
+
+  template<typename FnTy, typename PtCont>
+  CalcNextSteffenson(FnTy Fn, const PtCont &Pts) {}
+
+  template<typename FnTy, typename NormTy, typename PtCont>
+  ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
+    ValType Tmp = Fn(Pts.front());
+    ValType Tmp2 = Fn(Pts.front() + Tmp);
+    return Pts.front() - (Tmp * Tmp) / (Tmp2 - Tmp);
+  }
+
+  template<typename FnTy, typename PtCont>
+  void update(FnTy Fn, const PtCont &Pts) {}
+};
 
 template<IdxType Degree = 7>
 struct CalcNextSidi {
@@ -168,7 +178,7 @@ private:
 public:
   template<typename FnTy, typename NormTy, typename PtCont>
   ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
-    static std::mt19937 Rnd(static_cast<unsigned>(Norm(Fn(Pts[0]))));
+    static std::mt19937 Rnd(static_cast<unsigned>(Norm(Fn(Pts.front()))));
     static std::discrete_distribution<size_t> Distr({Probs...});
     using HelperTy = ValType (CalcNextMixed::*)(FnTy, NormTy, const PtCont &);
     static const HelperTy MethArr[] = {&CalcNextMixed::lambdaHelper<Methods, FnTy, NormTy, PtCont>...};
@@ -188,10 +198,14 @@ static PtColor
 getPointIndexN(FnTy Fn, NormTy Norm, ColorFnTy ColorFn, ValType Init) {
   constexpr IdxType UsedPts = Method::UsedPts;
 
-  CircularBuffer<ValType, UsedPts> Pts([Fn, Pt = Init]() mutable -> ValType {
-      ValType Old = Pt;
-      Pt = calcNextSteffensonL(Fn, Pt);
-      return Old;
+  CircularBuffer<ValType, UsedPts> Pts([Fn, Norm, Pt = Init]() mutable -> ValType {
+      const CircularBuffer<ValType, 1> PtBuf([Pt]() -> ValType {
+          return Pt;
+        });
+
+      CalcNextSteffenson Stf(Fn, PtBuf);
+      Pt = Stf.get(Fn, Norm, PtBuf);
+      return PtBuf.front();
     });
 
   Method Mth(Fn, Pts);

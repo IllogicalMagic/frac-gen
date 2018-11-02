@@ -18,11 +18,14 @@ $params = []
 case options[:method].to_s.downcase
 when "sidi", ""
   $method = "Sidi"
+  $params = ["7"]
 when "muller"
   $method = "Muller"
 when "mixed"
   $method = "Mixed"
   $params = ["std::index_sequence<10, 5>", "Sidi<4>", "Muller"]
+when "steffenson"
+  $method = "Steffenson"
 else
   fail "Unknown method"
 end
