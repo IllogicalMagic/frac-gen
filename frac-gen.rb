@@ -12,7 +12,10 @@ OptionParser.new do |opts|
   opts.on("-e", "--expr EXPR", "Use specified expression with fluctuations") { |v| options[:expr] = v }
   opts.on("-o", "--out-dir DIR", "Put results into specified directory") { |v| options[:dir] = v }
   opts.on("-m", "--method METHOD", "Iterative method name") { |v| options[:method] = v }
+  opts.on("-c", "--disable-conditionals", "Disable ternary operators") { |v| options[:notern] = true }
 end.parse!
+
+notern = options[:notern] == true
 
 $params = []
 case options[:method].to_s.downcase
@@ -23,7 +26,7 @@ when "muller"
   $method = "Muller"
 when "mixed"
   $method = "Mixed"
-  $params = ["std::index_sequence<10, 5>", "Sidi<4>", "Muller"]
+  $params = ["std::index_sequence<10, 5, 5>", "Sidi<4>", "Muller", "Steffenson"]
 when "steffenson"
   $method = "Steffenson"
 else
@@ -84,27 +87,27 @@ def simple_fn
   if $main.instance_variable_defined?(:@fns)
     $main.instance_variable_get(:@fns)
   else
-    $main.instance_variable_set(:@fns, [[NM + "sin", 1, :simple_fn],
-                                       [NM + "cos", 1, :simple_fn],
-                                       [NM + "tan", 1, :simple_fn],
-                                       [NM + "asin", 1, :simple_fn],
-                                       [NM + "acos", 1, :simple_fn],
-                                       [NM + "atan", 1, :simple_fn],
-                                       [NM + "sinh", 1, :simple_fn],
-                                       [NM + "cosh", 1, :simple_fn],
-                                       [NM + "tanh", 1, :simple_fn],
-                                       [NM + "asinh", 1, :simple_fn],
-                                       [NM + "acosh", 1, :simple_fn],
-                                       [NM + "atanh", 1, :simple_fn],
-                                       [NM + "exp", 1, :simple_fn],
-                                       [NM + "log", 1, :simple_fn],
-                                       [NM + "sqrt", 1, :simple_fn],
-                                       [NM + "pow", 2, :simple_fn],
-                                       ["+", nil, :simple_fn],
-                                       ["-", nil, :simple_fn],
-                                       ["*", nil, :simple_fn],
-                                       ["/", nil, :simple_fn]
-                                      ].map{ |args| Func.new(*args) })
+    $main.instance_variable_set(:@fns, [["+", nil, :simple_fn],
+                                        ["-", nil, :simple_fn],
+                                        ["*", nil, :simple_fn],
+                                        ["/", nil, :simple_fn],
+                                        [NM + "sin", 1, :simple_fn],
+                                        [NM + "cos", 1, :simple_fn],
+                                        [NM + "tan", 1, :simple_fn],
+                                        [NM + "asin", 1, :simple_fn],
+                                        [NM + "acos", 1, :simple_fn],
+                                        [NM + "atan", 1, :simple_fn],
+                                        [NM + "sinh", 1, :simple_fn],
+                                        [NM + "cosh", 1, :simple_fn],
+                                        [NM + "tanh", 1, :simple_fn],
+                                        [NM + "asinh", 1, :simple_fn],
+                                        [NM + "acosh", 1, :simple_fn],
+                                        [NM + "atanh", 1, :simple_fn],
+                                        [NM + "exp", 1, :simple_fn],
+                                        [NM + "log", 1, :simple_fn],
+                                        [NM + "sqrt", 1, :simple_fn],
+                                        [NM + "pow", 2, :simple_fn]
+                                       ].map{ |args| Func.new(*args) })
   end
 end
 
@@ -135,6 +138,16 @@ end
 class BadExpr < StandardError
 end
 
+if notern
+  $tern_prob = 1.0
+  $init_func = lambda { simple_fn[$rng.rand(4)] }
+  $max_prob = 2.0
+else
+  $tern_prob = 1.2
+  $init_func = lambda { Ternary.new }
+  $max_prob = 2.5
+end
+
 $level = nil
 
 class Node
@@ -149,6 +162,9 @@ class Node
     $level += 1
 
     @fn = fn
+    # If function has predefined set of operands
+    # (like ternary operator) just use it.
+    # Otherwise generate some new operands.
     if @fn.respond_to?(:operands)
       @operands = @fn.operands
     else
@@ -158,13 +174,13 @@ class Node
           fn = sel[$rng.rand(sel.size)]
           Node.new(fn)
         else
-          r = $rng.rand(simple_fn.size * 2.5)
+          r = $rng.rand(simple_fn.size * $max_prob)
           # Simple function.
           if (r < simple_fn.size)
             fn = simple_fn[$rng.rand(simple_fn.size)]
             Node.new(fn)
           # Ternary.
-          elsif r < simple_fn.size * 1.2
+          elsif r < simple_fn.size * $tern_prob
             Node.new(Ternary.new)
           # Leaf.
           else
@@ -204,9 +220,9 @@ end
 class Expr
   def initialize()
     $level = 0
-    @fn = Node.new(Ternary.new)
+    @fn = Node.new($init_func.call)
     $level = 0
-    @fn2 = Node.new(Ternary.new)
+    @fn2 = Node.new($init_func.call)
   end
 
   def to_s
