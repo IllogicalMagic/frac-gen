@@ -1,4 +1,3 @@
-#include "Config.h"
 #include "Drawer.h"
 #include "Types.h"
 

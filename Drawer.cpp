@@ -1,3 +1,4 @@
+#include "Color.h"
 #include "Config.h"
 #include "Drawer.h"
 
@@ -8,32 +9,19 @@
 
 using namespace Magick;
 
-static constexpr double pi23 = 2.094395102;
-
 auto drawFractal(const std::vector<PtColor> ColorIdxs) -> void {
   Image Fractal(Geometry(XLen, YLen), "black");
   Fractal.magick("png");
 
   for (int i = 0; i < XLen; ++i)
     for (int j = 0; j < YLen; ++j) {
-      auto PixelProps = ColorIdxs[i * XLen + j];
+      const auto &PixelProps = ColorIdxs[i * XLen + j];
       if (PixelProps.first) {
-        double Arg = PixelProps.second;
+        auto ColorVals = PixelProps.second.getRGB();
         ColorRGB C("black");
-        // Red - blue, blue - green, green - red
-        if (std::cos(Arg) >= 0.5) {
-          double Norm = Arg / pi23 + 1.5;
-          C.red(Norm);
-          C.blue(1.0 - Norm);
-        } else if (Arg <= 0) {
-          double Norm = Arg / pi23 + 0.5;
-          C.blue(Norm);
-          C.green(1.0 - Norm);
-        } else {
-          double Norm = Arg / pi23 - 0.5;
-          C.green(Norm);
-          C.red(1.0 - Norm);
-        }
+        C.red(std::get<0>(ColorVals));
+        C.green(std::get<1>(ColorVals));
+        C.blue(std::get<2>(ColorVals));
         Fractal.pixelColor(i, j, C);
       }
     }

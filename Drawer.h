@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-#include "Types.h"
+#include "Color.h"
 
 void drawFractal(const std::vector<PtColor> ColorIdx);
 

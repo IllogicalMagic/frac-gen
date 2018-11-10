@@ -359,14 +359,14 @@ getPointIndexN(FnTy Fn, NormTy Norm, ColorFnTy ColorFn, ValType Init) {
       break;
 
     if (Norm(Fn(Next)) < Epsilon)
-      return {true, ColorFn(Next)};
+      return {true, ColorFn(Next, i)};
 
     Pts.push_back(Next);
 
     Mth.update(Fn, Pts);
   }
 
-  return {false, 0.0};
+  return {false, false};
 }
 
 #endif

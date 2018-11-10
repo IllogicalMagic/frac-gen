@@ -19,6 +19,7 @@ constexpr int YLen = MaxY - MinY;
 constexpr FloatType Scale = 20.0;
 
 constexpr int MaxIters = 25;
+constexpr int ItersLogBase = 1000;
 
 constexpr FloatType Epsilon = 0.05;
 

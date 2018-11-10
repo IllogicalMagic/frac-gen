@@ -1,3 +1,4 @@
+#include "Color.h"
 #include "Config.h"
 #include "Norm.h"
 #include "Methods.hpp"
@@ -35,8 +36,8 @@ auto getFractal() -> std::vector<PtColor> {
   static auto Norm = [](ValType Pt) {
     return norm1(Pt);
   };
-  static auto ColorFn = [](ValType Pt) -> double {
-    return std::arg(Pt);
+  static auto ColorFn = [](ValType Pt, int Iters) {
+    return PointColor(Pt, Iters);
   };
 
   using Method = CalcNext<%= method %><%= method_params %>;
