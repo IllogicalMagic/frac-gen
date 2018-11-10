@@ -10,16 +10,30 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstdlib>
 
 auto getFractal() -> std::vector<PtColor> {
   std::vector<PtColor> ColorIdxs;
   ColorIdxs.reserve(XLen * YLen);
 
-  static auto Fn = [](ValType Pt) -> ValType {
-    <%= expr %>
+  struct Func {
+    ValType operator()(ValType Pt) {
+      static auto Fn = [](ValType Pt) -> ValType {
+        <%= expr %>
+      };
+      return Fn(Pt);
+    }
+
+    static ValType diff(ValType Pt) {
+      static auto FnDiff = [](ValType Pt) -> ValType {
+        <%= expr_diff %>
+      };
+      return FnDiff(Pt);
+    }
   };
+
   static auto Norm = [](ValType Pt) {
-    return norm2(Pt);
+    return norm1(Pt);
   };
   static auto ColorFn = [](ValType Pt) -> double {
     return std::arg(Pt);
@@ -31,7 +45,7 @@ auto getFractal() -> std::vector<PtColor> {
     FloatType X = static_cast<FloatType>(i) / Scale + CX;
     for (int j = MinY; j < MaxY; ++j) {
       FloatType Y = static_cast<FloatType>(j) / Scale + CY;
-      ColorIdxs.emplace_back(getPointIndexN<Method>(Fn, Norm, ColorFn, ValType(X, Y)));
+      ColorIdxs.emplace_back(getPointIndexN<Method>(Func(), Norm, ColorFn, ValType(X, Y)));
     }
     std::cerr << '.';
   }

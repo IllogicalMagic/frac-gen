@@ -12,6 +12,46 @@
 #include <utility>
 
 #include <cmath>
+#include <cstdlib>
+
+struct CalcNextNewton {
+  static constexpr IdxType UsedPts = 1;
+
+  template<typename FnTy, typename PtCont>
+  CalcNextNewton(FnTy Fn, const PtCont &Pts) {}
+
+  template<typename FnTy, typename NormTy, typename PtCont>
+  ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
+    ValType FnRes = Fn(Pts.front());
+    ValType DiffRes = Fn.diff(Pts.front());
+    return Pts.front() - FnRes / DiffRes;
+  }
+
+  template<typename FnTy, typename PtCont>
+  void update(FnTy Fn, const PtCont &Pts) {}
+};
+
+struct CalcNextChord {
+  static constexpr IdxType UsedPts = 1;
+
+private:
+  ValType InitPt;
+  ValType FnInit;
+
+public:
+  template<typename FnTy, typename PtCont>
+  CalcNextChord(FnTy Fn, const PtCont &Pts):
+    InitPt(Pts.front()), FnInit(Fn(InitPt)) {}
+
+  template<typename FnTy, typename NormTy, typename PtCont>
+  ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
+    ValType F0 = Fn(Pts.front());
+    return Pts.front() - FnInit * (InitPt - Pts.front()) / (FnInit - F0);
+  }
+
+  template<typename FnTy, typename PtCont>
+  void update(FnTy Fn, const PtCont &Pts) {}
+};
 
 // Steffenson's method. Helper for bootstrap stages.
 struct CalcNextSteffenson {
