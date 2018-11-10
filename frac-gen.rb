@@ -13,9 +13,11 @@ OptionParser.new do |opts|
   opts.on("-o", "--out-dir DIR", "Put results into specified directory") { |v| options[:dir] = v }
   opts.on("-m", "--method METHOD", "Iterative method name") { |v| options[:method] = v }
   opts.on("-c", "--disable-conditionals", "Disable ternary operators") { |v| options[:notern] = true }
+  opts.on("-a", "--with-abs VAL", "Find absolute value of function, not zeros") { |v| options[:abs] = v }
 end.parse!
 
 notern = options[:notern] == true
+$abs = options[:abs]
 
 $params = []
 $need_diff = false
@@ -25,10 +27,14 @@ when "sidi", ""
   $params = ["7"]
 when "muller"
   $method = "Muller"
+when "mixed_random"
+  $method = "MixedRandom"
+  $params = ["std::index_sequence<10, 5>", "%MSidi<4>", "%MContractor"]
+# $need_diff = true
 when "mixed"
   $method = "Mixed"
-  $params = ["std::index_sequence<10, 10>", "Sidi<4>", "Newton"]
-  $need_diff = true
+  $params = ["%MInvertedContractor", "%MLogContractor", "%MContractor"]
+# $need_diff = true
 when "steffenson"
   $method = "Steffenson"
 when "newton"
@@ -36,8 +42,18 @@ when "newton"
   $need_diff = true
 when "chord"
   $method = "Chord"
+when "contractor"
+  $method = "Contractor"
+when "inverted_contractor"
+  $method = "InvertedContractor"
+when "log_contractor"
+  $method = "LogContractor"
 else
   fail "Unknown method"
+end
+
+if $need_diff and (!$abs.nil? or notern != true)
+  fail "Conditionals or absolute values are not allowed with methods that need derivative!"
 end
 
 $seed = (options[:seed] || Time.now).to_i
@@ -425,7 +441,12 @@ class Expr
 
   def to_s
     if @expr.nil?
-      @expr = "ValType Fn1 = #{@fn};\n"
+      if $abs
+        fn = "std::abs(#{@fn}) - ValType(#{$abs}, 0.0)"
+      else
+        fn = "#{@fn}"
+      end
+      @expr = "ValType Fn1 = #{fn};\n"
       @expr += "return Fn1;"
     else
       @expr
@@ -468,7 +489,7 @@ def generate_image(expr, expr_diff)
   if $params.empty?
     method_params = ""
   else
-    method_params = [$params[0]] + $params[1..-1].map{ |p| "CalcNext#{p}" }
+    method_params = $params.map{ |p| p.sub("%M", "CalcNext") }
     method_params = method_params.join(", ")
     method_params = "<#{method_params}>"
   end

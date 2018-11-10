@@ -12,7 +12,51 @@
 #include <utility>
 
 #include <cmath>
-#include <cstdlib>
+
+struct CalcNextContractor {
+  static constexpr IdxType UsedPts = 1;
+
+  template<typename FnTy, typename PtCont>
+  CalcNextContractor(FnTy Fn, const PtCont &Pts) {}
+
+  template<typename FnTy, typename NormTy, typename PtCont>
+  ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
+    return Fn(Pts.front());
+  }
+
+  template<typename FnTy, typename PtCont>
+  void update(FnTy Fn, const PtCont &Pts) {}
+};
+
+struct CalcNextInvertedContractor {
+  static constexpr IdxType UsedPts = 1;
+
+  template<typename FnTy, typename PtCont>
+  CalcNextInvertedContractor(FnTy Fn, const PtCont &Pts) {}
+
+  template<typename FnTy, typename NormTy, typename PtCont>
+  ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
+    return 1.0 / Fn(Pts.front());
+  }
+
+  template<typename FnTy, typename PtCont>
+  void update(FnTy Fn, const PtCont &Pts) {}
+};
+
+struct CalcNextLogContractor {
+  static constexpr IdxType UsedPts = 1;
+
+  template<typename FnTy, typename PtCont>
+  CalcNextLogContractor(FnTy Fn, const PtCont &Pts) {}
+
+  template<typename FnTy, typename NormTy, typename PtCont>
+  ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
+    return std::log(Fn(Pts.front()));
+  }
+
+  template<typename FnTy, typename PtCont>
+  void update(FnTy Fn, const PtCont &Pts) {}
+};
 
 struct CalcNextNewton {
   static constexpr IdxType UsedPts = 1;
@@ -199,15 +243,16 @@ struct CalcNextMuller {
 };
 
 template<typename I, typename... Methods>
-struct CalcNextMixed;
+struct CalcNextMixedRandom;
 
+// Metamethod that calls specified methods according to given distribution parameters.
 template<size_t... Probs, typename... Methods>
-struct CalcNextMixed<std::index_sequence<Probs...>, Methods...> : Methods... {
+struct CalcNextMixedRandom<std::index_sequence<Probs...>, Methods...> : Methods... {
   static_assert(sizeof...(Probs) == sizeof...(Methods), "Wrong mixed parameters");
   static constexpr IdxType UsedPts = std::max({Methods::UsedPts...});
 
   template<typename FnTy, typename PtCont>
-  CalcNextMixed(FnTy Fn, const PtCont &Pts): Methods(Fn, Pts)... {}
+  CalcNextMixedRandom(FnTy Fn, const PtCont &Pts): Methods(Fn, Pts)... {}
 
 private:
   template<typename T, typename FnTy, typename NormTy, typename PtCont>
@@ -220,8 +265,9 @@ public:
   ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
     static std::mt19937 Rnd(static_cast<unsigned>(Norm(Fn(Pts.front()))));
     static std::discrete_distribution<size_t> Distr({Probs...});
-    using HelperTy = ValType (CalcNextMixed::*)(FnTy, NormTy, const PtCont &);
-    static const HelperTy MethArr[] = {&CalcNextMixed::lambdaHelper<Methods, FnTy, NormTy, PtCont>...};
+    using HelperTy = ValType (CalcNextMixedRandom::*)(FnTy, NormTy, const PtCont &);
+    static const HelperTy MethArr[] = {&CalcNextMixedRandom::lambdaHelper<Methods, FnTy, NormTy, PtCont>...};
+
 
     return (this->*MethArr[Distr(Rnd)])(Fn, Norm, Pts);
   }
@@ -231,6 +277,63 @@ public:
     int X[] = {(this->Methods::update(Fn, Pts), 0)...};
     (void) X;
   }
+};
+
+template<size_t Idx, typename Method>
+struct MethodWrap : Method {
+  using Method::get;
+  using Method::update;
+
+  template<typename...Args>
+  MethodWrap(Args&&... args): Method(std::forward<Args>(args)...) {}
+};
+
+template<typename I, typename... Methods>
+struct CalcNextMixedHelper;
+
+template<size_t... Idx, typename... Methods>
+struct CalcNextMixedHelper<std::index_sequence<Idx...>, Methods...> : MethodWrap<Idx, Methods>... {
+  template<typename FnTy, typename PtCont>
+  CalcNextMixedHelper(FnTy Fn, const PtCont &Pts):
+    MethodWrap<Idx, Methods>(Fn, Pts)... {}
+
+private:
+  template<typename T, typename FnTy, typename NormTy, typename PtCont>
+  ValType lambdaHelper(FnTy Fn, NormTy Norm, const PtCont &Pt) {
+    return this->T::get(Fn, Norm, Pt);
+  }
+
+public:
+  template<typename FnTy, typename NormTy, typename PtCont>
+  ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
+    static size_t Counter = 0;
+    using HelperTy = ValType (CalcNextMixedHelper::*)(FnTy, NormTy, const PtCont &);
+    static const HelperTy MethArr[] = {&CalcNextMixedHelper::lambdaHelper<MethodWrap<Idx, Methods>, FnTy, NormTy, PtCont>...};
+
+    ValType Res = (this->*MethArr[Counter++])(Fn, Norm, Pts);
+    if (Counter >= sizeof...(Methods))
+      Counter = 0;
+    return Res;
+  }
+
+  template<typename FnTy, typename PtCont>
+  void update(FnTy Fn, const PtCont &Pts) {
+    int X[] = {(this->MethodWrap<Idx, Methods>::update(Fn, Pts), 0)...};
+    (void) X;
+  }
+};
+
+// Metamethod that sequentially calls specified methods.
+template<typename... Methods>
+struct CalcNextMixed: CalcNextMixedHelper<std::index_sequence_for<Methods...>, Methods...> {
+  using Base = CalcNextMixedHelper<std::index_sequence_for<Methods...>, Methods...>;
+  using Base::get;
+  using Base::update;
+
+  static constexpr IdxType UsedPts = std::max({Methods::UsedPts...});
+
+  template<typename FnTy, typename PtCont>
+  CalcNextMixed(FnTy Fn, const PtCont &Pts): Base(Fn, Pts) {}
 };
 
 template<typename Method, typename FnTy, typename NormTy, typename ColorFnTy>
