@@ -97,12 +97,12 @@ public:
   void update(FnTy Fn, const PtCont &Pts) {}
 };
 
-// Steffenson's method. Helper for bootstrap stages.
-struct CalcNextSteffenson {
+// Steffensen's method. Helper for bootstrap stages.
+struct CalcNextSteffensen {
   static constexpr IdxType UsedPts = 1;
 
   template<typename FnTy, typename PtCont>
-  CalcNextSteffenson(FnTy Fn, const PtCont &Pts) {}
+  CalcNextSteffensen(FnTy Fn, const PtCont &Pts) {}
 
   template<typename FnTy, typename NormTy, typename PtCont>
   ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
@@ -346,7 +346,7 @@ getPointIndexN(FnTy Fn, NormTy Norm, ColorFnTy ColorFn, ValType Init) {
           return Pt;
         });
 
-      CalcNextSteffenson Stf(Fn, PtBuf);
+      CalcNextSteffensen Stf(Fn, PtBuf);
       Pt = Stf.get(Fn, Norm, PtBuf);
       return PtBuf.front();
     });

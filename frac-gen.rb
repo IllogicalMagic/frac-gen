@@ -35,8 +35,8 @@ when "mixed"
   $method = "Mixed"
   $params = ["%MInvertedContractor", "%MLogContractor", "%MContractor"]
 # $need_diff = true
-when "steffenson"
-  $method = "Steffenson"
+when "steffensen"
+  $method = "Steffensen"
 when "newton"
   $method = "Newton"
   $need_diff = true
