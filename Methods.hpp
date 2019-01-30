@@ -211,6 +211,77 @@ public:
   }
 };
 
+// Sidi's method with error in calculation
+// of derivative and update function.
+// It is strange but it gave very interesting images
+// combined with absolute value of some function.
+template<IdxType Degree = 7>
+struct CalcNextSidiErroneus {
+  static constexpr IdxType UsedPts = Degree + 1;
+
+private:
+  static constexpr IdxType PNum = UsedPts;
+  static constexpr IdxType StorageSize = nextPow2<IdxType, PNum>();
+  static constexpr IdxType Mask = StorageSize - 1;
+  static_assert((Mask & (Mask + 1)) == 0, "Mask should be power of 2 minus one!");
+
+  ValType DW[PNum][StorageSize] = {{0.0}};
+  IdxType DWPos = 0;
+  ValType Diffs[Degree] = {0.0};
+
+  IdxType getDWIdx(IdxType Idx) const {
+    return (DWPos + Idx) & Mask;
+  }
+
+  void advanceDWIdx() {
+    DWPos = getDWIdx(1);
+  }
+
+public:
+  template<typename FnTy, typename PtCont>
+  CalcNextSidiErroneus(FnTy Fn, const PtCont &Pts) {
+    for (IdxType i = 0; i < PNum; ++i)
+      DW[0][i] = Fn(Pts[i]);
+
+    for (IdxType i = 1; i < PNum; ++i)
+      for (IdxType j = i; j < PNum; ++j) {
+        DW[i][j] = (DW[i - 1][j] - DW[i - 1][j - 1]) / (Pts[j] - Pts[j - i]);
+      }
+
+    for (IdxType i = 0; i < Degree; ++i)
+      Diffs[i] = Pts[Degree] - Pts[i];
+  }
+
+  template<typename FnTy, typename NormTy, typename PtCont>
+  ValType get(FnTy Fn, NormTy Norm, const PtCont &Pts) {
+    IdxType Cur = getDWIdx(Degree);
+
+    ValType Last = DW[Degree][Cur];
+    ValType Drv = Last;
+    for (IdxType j = Degree - 1; j > 0; --j) {
+      Drv *= Diffs[j - 1];
+      Last = DW[j][getDWIdx(j)] + Last * Pts[j];
+      Drv += Last;
+    }
+
+    return Pts[Degree] + DW[0][Cur] / Drv;
+  }
+
+  template<typename FnTy, typename PtCont>
+  void update(FnTy Fn, const PtCont &Pts) {
+    advanceDWIdx();
+
+    // Renew table.
+    // Just update one last column.
+    DW[0][getDWIdx(Degree)] = Fn(Pts[Degree]);
+    for (IdxType j = 1; j < PNum; ++j) {
+      DW[j][getDWIdx(Degree + j)] =
+        (DW[j - 1][getDWIdx(Degree + j)] - DW[j - 1][getDWIdx(Degree + j - 1)]) /
+        (Pts[Degree] - Pts[Degree - j]);
+    }
+  }
+};
+
 struct CalcNextMuller {
   static constexpr IdxType UsedPts = 3;
 

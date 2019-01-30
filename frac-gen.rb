@@ -25,6 +25,9 @@ case options[:method].to_s.downcase
 when "sidi", ""
   $method = "Sidi"
   $params = ["7"]
+when "sidi_error"
+  $method = "SidiErroneus"
+  $params = ["7"]
 when "muller"
   $method = "Muller"
 when "mixed_random"
@@ -531,7 +534,7 @@ else
   subst_num = 0.0
   loop do
     expr_subst = expr.sub("NUM", subst_num.to_s)
-    generate_image(expr_subst)
+    generate_image(expr_subst, "abort(); return 0.0;")
     subst_num += 0.01
     $num += 1
   end
