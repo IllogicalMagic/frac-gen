@@ -1,0 +1,5 @@
+*.o
+*~
+FracGen
+Images
+FracMath.cpp
