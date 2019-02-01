@@ -14,6 +14,7 @@ OptionParser.new do |opts|
   opts.on("-m", "--method METHOD", "Iterative method name") { |v| options[:method] = v }
   opts.on("-c", "--disable-conditionals", "Disable ternary operators") { |v| options[:notern] = true }
   opts.on("-a", "--with-abs VAL", "Find absolute value of function, not zeros") { |v| options[:abs] = v }
+  opts.on("-d", "--diff-expr EXPR", "Considered to be first derivative of expression specified in --expr") { |v| options[:diff] = v }
 end.parse!
 
 notern = options[:notern] == true
@@ -509,6 +510,8 @@ def generate_image(expr, expr_diff)
   FileUtils.mv(fi, $dir)
 end
 
+DEFAULT_DIFF = "abort(); return 0.0;"
+
 if options[:expr].nil?
   loop do
     break if $stop
@@ -522,7 +525,7 @@ if options[:expr].nil?
     if $need_diff
       expr_diff = expr_tree_diff.to_s
     else
-      expr_diff = "abort(); return 0.0;"
+      expr_diff = DEFAULT_DIFF
     end
     puts expr
     puts expr_diff
@@ -531,10 +534,11 @@ if options[:expr].nil?
   end
 else
   expr = options[:expr]
+  expr_diff = options[:diff] || DEFAULT_DIFF
   subst_num = 0.0
   loop do
     expr_subst = expr.sub("NUM", subst_num.to_s)
-    generate_image(expr_subst, "abort(); return 0.0;")
+    generate_image(expr_subst, expr_diff)
     subst_num += 0.01
     $num += 1
   end
