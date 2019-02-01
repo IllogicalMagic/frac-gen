@@ -13,12 +13,14 @@ Just clone sources to some directory and try `./frac-gen.rb`. Probably you will 
 
 ## Supported options
 frac-gen.rb has some options to control what method is used, how it is used and how expressions are generated. Current list of options:
+* `--help` -- contains the most recent version of list of options. This readme is not always updated.
 * `--seed=NUM` -- use specified seed for expression generation.
 * `--expr=expression` -- generate image for specified expression.
 * `--out-dir=DIR` -- put images in specified directory.
 * `--method=method` -- use specified method for generation. List of available methods can be seen in frac-gen.rb (starting from line 26).
 * `--disable-conditionals` -- generate only simple expressions without ternary operators.
-* `--with-abs=NUM` -- generate functions of the form `|fn| = NUM`
+* `--with-abs=NUM` -- generate functions of the form `|fn| = NUM`.
+* `--diff-exp=EXPR" -- considered to be derivative of expression specified in --expr parameter.
 
 ## Known issues
 GCC can hang while compiling some mathematical expressions.
