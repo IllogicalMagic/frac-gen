@@ -56,8 +56,15 @@ else
   fail "Unknown method"
 end
 
-if $need_diff and (!$abs.nil? or notern != true)
-  fail "Conditionals or absolute values are not allowed with methods that need derivative!"
+# Check generator mode paramenters.
+if options[:expr].nil?
+  if $need_diff and (!$abs.nil? or notern != true)
+    fail "Conditionals or absolute values are not allowed with methods that need derivative!"
+  end
+else
+  if $need_diff and options[:diff].nil?
+    fail "Method needs derivative of specified function!"
+  end
 end
 
 $seed = (options[:seed] || Time.now).to_i
