@@ -20,7 +20,7 @@ frac-gen.rb has some options to control what method is used, how it is used and 
 * `--method=method` -- use specified method for generation. List of available methods can be seen in frac-gen.rb (starting from line 26).
 * `--disable-conditionals` -- generate only simple expressions without ternary operators.
 * `--with-abs=NUM` -- generate functions of the form `|fn| = NUM`.
-* `--diff-exp=EXPR" -- considered to be derivative of expression specified in --expr parameter.
+* `--diff-exp=EXPR` -- considered to be derivative of expression specified in --expr parameter.
 
 ## Known issues
 GCC can hang while compiling some mathematical expressions.
