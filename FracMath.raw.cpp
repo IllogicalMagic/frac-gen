@@ -33,20 +33,17 @@ auto getFractal() -> std::vector<PtColor> {
     }
   };
 
-  static auto Norm = [](ValType Pt) {
-    return norm1(Pt);
-  };
   static auto ColorFn = [](ValType Pt, int Iters) {
     return PointColor(Pt, Iters);
   };
 
-  using Method = CalcNext<%= method %><%= method_params %>;
+  using Method = CalcNext<%= method %>;
 
   for (int i = MinX; i < MaxX; ++i) {
     FloatType X = static_cast<FloatType>(i) / Scale + CX;
     for (int j = MinY; j < MaxY; ++j) {
       FloatType Y = static_cast<FloatType>(j) / Scale + CY;
-      ColorIdxs.emplace_back(getPointIndexN<Method>(Func(), Norm, ColorFn, ValType(X, Y)));
+      ColorIdxs.emplace_back(getPointIndexN<Method>(Func(), UsedNorm, ColorFn, ValType(X, Y)));
     }
     std::cerr << '.';
   }

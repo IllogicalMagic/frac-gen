@@ -16,11 +16,11 @@ constexpr int MinY = -500 + OffsetY;
 constexpr int MaxY = 500 + OffsetY;
 constexpr int YLen = MaxY - MinY;
 
-constexpr FloatType Scale = 20.0;
+constexpr FloatType Scale = <%= scale %>;
 
-constexpr int MaxIters = 25;
+constexpr int MaxIters = <%= iters %>;
 constexpr int ItersLogBase = 1000;
 
-constexpr FloatType Epsilon = 0.05;
+constexpr FloatType Epsilon = <%= epsilon %>;
 
 #endif

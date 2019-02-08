@@ -25,7 +25,7 @@ public:
   RGBColor getRGB() const {
     RGBColor C;
     FloatType Arg = std::arg(CircleCoordinate);
-    FloatType R = norm1(CircleCoordinate);
+    FloatType R = UsedNorm(CircleCoordinate);
     // Red - blue, blue - green, green - red
     if (std::cos(Arg) >= 0.5) {
       double Norm = Arg / pi23 + 1.5;

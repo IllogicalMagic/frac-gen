@@ -34,4 +34,7 @@ FloatType normC(ValType V) {
   return 3.0 * std::abs(V.real()) + std::sqrt(2.0 * std::abs(V.imag()) + std::pow(std::abs(V.real()), 5.0));
 }
 
+// Used norm is here.
+#include "Norm.X.h"
+
 #endif

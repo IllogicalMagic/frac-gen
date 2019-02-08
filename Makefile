@@ -7,11 +7,11 @@ LDLIBS?=$(MAGICLIBS)
 
 all: FracGen
 
-Drawer.o: Drawer.cpp Drawer.h Config.h
+Drawer.o: Drawer.cpp Drawer.h Config.h Norm.h
 
 FracGen.o: FracGen.cpp Types.h
 
-FracMath.o: FracMath.cpp Config.h Types.h Methods.hpp
+FracMath.o: FracMath.cpp Config.h Types.h Methods.hpp Norm.h
 
 FracGen: FracGen.o FracMath.o Drawer.o
 	$(CXX) $(LDFLAGS) $(LDLIBS) $^ -o $@

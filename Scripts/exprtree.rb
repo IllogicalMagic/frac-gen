@@ -256,7 +256,7 @@ module ExprTree
 
     def to_s
       ops = @operands.map{ |o| o.to_s }
-      "(" + ops[0] + ") ? (" + ops[1] + ") : (" + ops[2] + ")"
+      "((" + ops[0] + ") ? (" + ops[1] + ") : (" + ops[2] + "))"
     end
   end # class Ternary
 
