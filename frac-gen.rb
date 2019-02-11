@@ -21,6 +21,10 @@ OptionParser.new do |opts|
   opts.on("-n", "--norm N", "Specify used metric norm") { |v| options[:norm] = v }
   opts.on("-l", "--scale S", "Specify scale") { |v| options[:scale] = v }
   opts.on("-i", "--iters I", "Specify number of iterations") { |v| options[:iters] = v }
+  opts.on("", "--x-center X", "Specify X coordinate of center") { |v| options[:c_x] = v }
+  opts.on("", "--y-center Y", "Specify Y coordinate of center") { |v| options[:c_y] = v }
+  opts.on("-x", "--length L", "Specify image length in pixels") { |v| options[:xlen] = v }
+  opts.on("-y", "--height H", "Specify image height in pixels") { |v| options[:ylen] = v }
 end.parse!
 
 FRACMATH_FILE = 'FracMath.raw.cpp'
@@ -30,6 +34,10 @@ NORM_FILE = 'Norm.X.raw.h'
 DEFAULT_SCALE = 20.0
 DEFAULT_ITERS = 25
 DEFAULT_EPSILON = 0.05
+DEFAULT_C_X = 0.0
+DEFAULT_C_Y = 0.0
+DEFAULT_XLEN = 1000
+DEFAULT_YLEN = 1000
 DEFAULT_NORM = "norm2"
 
 DEFAULT_EXPR = "abort(); return 0.0;"
@@ -49,12 +57,9 @@ def reproduce_exprs_mode(cfg_opts, exprs, opts)
     Dir.mkdir(dir)
   end
 
-  epsilon = cfg_opts[:epsilon] || DEFAULT_EPSILON
-  norm = cfg_opts[:norm] || DEFAULT_NORM
-  scale = cfg_opts[:scale] || DEFAULT_SCALE
-  iters = cfg_opts[:iters] || DEFAULT_ITERS
+  fill_missed_opts(cfg_opts)
 
-  configure_sources(epsilon, norm, scale, iters)
+  configure_sources(cfg_opts)
 
   params = cfg_opts[:params] || ""
   unless params.empty?
@@ -110,7 +115,27 @@ def select_method(method)
   [method, params, need_diff]
 end
 
-def configure_sources(epsilon, norm, scale, iters)
+def fill_missed_opts(opts)
+  opts[:epsilon] ||= DEFAULT_EPSILON
+  opts[:norm] ||= DEFAULT_NORM
+  opts[:scale] ||= DEFAULT_SCALE
+  opts[:iters] ||= DEFAULT_ITERS
+  opts[:c_x] ||= DEFAULT_C_X
+  opts[:c_y] ||= DEFAULT_C_Y
+  opts[:xlen] ||= DEFAULT_XLEN
+  opts[:ylen] ||= DEFAULT_YLEN
+end
+
+def configure_sources(opts)
+  epsilon = opts[:epsilon]
+  norm = opts[:norm]
+  scale = opts[:scale]
+  iters = opts[:iters]
+  c_x = opts[:c_x]
+  c_y = opts[:c_y]
+  xlen = opts[:xlen]
+  ylen = opts[:ylen]
+
   file = CONFIG_FILE.sub(".raw", "")
   File.open(file, "w") do |f|
     f << ERB.new(File.read(CONFIG_FILE)).result(binding)
@@ -148,10 +173,7 @@ def produce_mode(opts)
   cfg_name = File.join(dir, "config.txt")
   cfg = Config::Config.new(file: cfg_name, read: false)
 
-  epsilon = opts[:epsilon] || DEFAULT_EPSILON
-  norm = opts[:norm] || DEFAULT_NORM
-  scale = opts[:scale] || DEFAULT_SCALE
-  iters = opts[:iters] || DEFAULT_ITERS
+  fill_missed_opts(opts)
 
   unless params.empty?
     params = params.map{ |p| p.sub("%M", "CalcNext") }
@@ -159,10 +181,9 @@ def produce_mode(opts)
   params = params.join(", ")
 
   cfg.save_header(method: method, method_params: params,
-                  epsilon: epsilon, norm: norm, scale: scale,
-                  iters: iters)
+                  opts: opts)
 
-  configure_sources(epsilon, norm, scale, iters)
+  configure_sources(opts)
 
   unless params.empty?
     method += "<#{params}>"
@@ -204,16 +225,12 @@ def produce_with_cfg_mode(cfg_opts, opts)
   cfg_name = File.join(dir, "config.txt")
   cfg = Config::Config.new(file: cfg_name, read: false)
 
-  epsilon = cfg_opts[:epsilon] || DEFAULT_EPSILON
-  norm = cfg_opts[:norm] || DEFAULT_NORM
-  scale = cfg_opts[:scale] || DEFAULT_SCALE
-  iters = cfg_opts[:iters] || DEFAULT_ITERS
+  fill_missed_opts(cfg_opts)
 
   cfg.save_header(method: method, method_params: params,
-                  epsilon: epsilon, norm: norm, scale: scale,
-                  iters: iters)
+                  opts: cfg_opts)
 
-  configure_sources(epsilon, norm, scale, iters)
+  configure_sources(cfg_opts)
 
   unless params.empty?
     method += "<#{params}>"

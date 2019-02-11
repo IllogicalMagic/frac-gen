@@ -3,18 +3,11 @@
 
 #include "Types.h"
 
-constexpr int OffsetX = 0;
-constexpr int OffsetY = 0;
+constexpr FloatType CX = <%= c_x %>;
+constexpr FloatType CY = <%= c_y %>;
 
-constexpr FloatType CX = 0;
-constexpr FloatType CY = 0;
-
-constexpr int MinX = -500 + OffsetX;
-constexpr int MaxX = 500 + OffsetX;
-constexpr int XLen = MaxX - MinX;
-constexpr int MinY = -500 + OffsetY;
-constexpr int MaxY = 500 + OffsetY;
-constexpr int YLen = MaxY - MinY;
+constexpr int XLen = <%= xlen %>;
+constexpr int YLen = <%= ylen %>;
 
 constexpr FloatType Scale = <%= scale %>;
 

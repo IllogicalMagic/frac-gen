@@ -15,7 +15,7 @@ auto drawFractal(const std::vector<PtColor> ColorIdxs) -> void {
 
   for (int i = 0; i < XLen; ++i)
     for (int j = 0; j < YLen; ++j) {
-      const auto &PixelProps = ColorIdxs[i * XLen + j];
+      const auto &PixelProps = ColorIdxs[i * YLen + j];
       if (PixelProps.first) {
         auto ColorVals = PixelProps.second.getRGB();
         ColorRGB C("black");

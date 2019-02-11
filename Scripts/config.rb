@@ -12,7 +12,11 @@ module Config
                     "Epsilon" => :epsilon,
                     "Norm" => :norm,
                     "Scale" => :scale,
-                    "Iterations" => :iters}
+                    "Iterations" => :iters,
+                    "X of center" => :c_x,
+                    "Y of center" => :c_y,
+                    "Length of image" => :xlen,
+                    "Height of image" => :ylen}
     def load_header
       hdr = @file.gets.rstrip
       fail "No header in config" if hdr != "--- HEADER ---"
@@ -84,15 +88,18 @@ module Config
       exprs
     end
 
-    def save_header(method:, method_params:, epsilon:, norm:,
-                    scale:, iters:)
+    def save_header(method:, method_params:, opts:)
       @file.puts("--- HEADER ---")
       @file.puts("Method: #{method}")
       @file.puts("Method parameters: #{method_params}")
-      @file.puts("Epsilon: #{epsilon}")
-      @file.puts("Norm: #{norm}")
-      @file.puts("Scale: #{scale}")
-      @file.puts("Iterations: #{iters}")
+      @file.puts("Epsilon: #{opts.fetch(:epsilon)}")
+      @file.puts("Norm: #{opts.fetch(:norm)}")
+      @file.puts("Scale: #{opts.fetch(:scale)}")
+      @file.puts("Iterations: #{opts.fetch(:iters)}")
+      @file.puts("X of center: #{opts.fetch(:c_x)}")
+      @file.puts("Y of center: #{opts.fetch(:c_y)}")
+      @file.puts("Length of image: #{opts.fetch(:xlen)}")
+      @file.puts("Height of image: #{opts.fetch(:ylen)}")
       @file.puts("--- HEADER ---")
     end
 
